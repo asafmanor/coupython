@@ -3,14 +3,17 @@ import logging
 import random
 from typing import Callable
 
-from cards import Ambassador, Assassin, Captain, Contessa, Duke
-from utils import Action, EmptyDeckError, IllegalActionError, InsufficientFundsError, TargetAction, CounterAction
+import numpy as np
 
-logger = logging.getLogger(__name__)
-
-
-def get_time_for_move():
-    return 1
+from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
+from utils import (
+    Action,
+    CounterAction,
+    EmptyDeckError,
+    IllegalActionError,
+    InsufficientFundsError,
+    TargetAction,
+)
 
 
 class Deck:
@@ -21,7 +24,7 @@ class Deck:
         cards += [Ambassador(i) for i in range(3)]
         cards += [Captain(i) for i in range(3)]
         cards += [Contessa(i) for i in range(3)]
-        self.cards = cards
+        self.cards = CardList(cards)
 
     def shuffle(self):
         random.shuffle(self.cards)
@@ -41,43 +44,13 @@ class Deck:
         return len(self.cards)
 
 
-def random_logic_mixin(
-    prob_INCOME: Callable,
-    prob_FOREIGNAID: Callable,
-    prob_COUP: Callable,
-    prob_TAKE3: Callable,
-    prob_ASS: Callable,
-    prob_EX: Callable,
-    prob_STEAL: Callable,
-):
-    class RandomLogicMixIn:
-        async def _lose_influence(self):
-            asyncio.sleep(get_time_for_move())
-            random.shuffle(self.cards)
-            return self.cards.pop()
-
-        async def _finalize_exchange(self, extra_cards: list):
-            asyncio.sleep(get_time_for_move())
-            current_num_cards = len(self.cards)
-            cards = self.cards + extra_cards
-            random.shuffle(cards)
-            cards.pop()
-            if current_num_cards == 1:
-                cards.pop()
-            self.cards = cards
-
-        async def _counter_action(self, action, source):
-            asyncio.sleep(get_time_for_move())
-            if action == Action.ASS_AS_TARGET:
-                do_contessa = bool(random < 0.5)
-
-
-class Player(RandomLogicMixIn):
+class Player:
     # TODO: implement > 10 cards check
     # methods beginning with target_ are called when you are the target of an action
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
         self.cards: list = None
+        self.logger = logging.getLogger(name)
 
     @property
     def coins(self):
@@ -113,7 +86,9 @@ class Player(RandomLogicMixIn):
             )
 
     async def counter_action(self, action: Action, source):
-        await self._counter_action(action, source)
+        counter_action = await self._counter_action(action, source)
+        if counter_action is not None:
+            self.logger.info(f"Performed counter-action {counter_action}")
 
     async def target_assassinate(self, source):
         """Called when you the player is the target of an assassination."""
@@ -121,11 +96,15 @@ class Player(RandomLogicMixIn):
         if counter_action is None:
             self.lose_influence()
 
+        return counter_action
+
     async def target_steal(self, source):
         """Called when you the player is the target of stealing."""
         counter_action = await self.counter_action(TargetAction.STEAL_AS_TARGET, source)
         if counter_action is None:
             self.coins -= 2
+
+        return counter_action
 
     def steal(self, target):
         if target.coins < 2:
@@ -138,6 +117,18 @@ class Player(RandomLogicMixIn):
 
     def lose_influence(self, discard) -> int:
         card = self._lose_influence()
-        logger.info(f"Player {self.name} lost a {card.name} influence")
+        self.logger.info(f"Lost a {card.name} influence")
         discard.cards.append(card)
         return len(self.cards)
+
+    async def _lose_influence(self):
+        raise NotImplementedError
+
+    async def _finalize_exchange(self, extra_cards: list):
+        raise NotImplementedError
+
+    async def _counter_action(self, action, source):
+        raise NotImplementedError
+
+    async def _proactive_action(self):
+        raise NotImplementedError

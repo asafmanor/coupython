@@ -23,12 +23,12 @@ class Action(enum.Enum):
     STEAL = 6
 
 
-class TargetAction:
+class TargetAction(enum.Enum):
     STEAL_AS_TARGET = 0
     ASSA_AS_TARGET = 1
 
 
-class CounterAction:
+class CounterAction(enum.Enum):
     BLOCKFOREIGNAID = 0
     BLOCKSTEALING = 1
     BLOCKASSA = 2
