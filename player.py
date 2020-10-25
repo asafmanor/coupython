@@ -16,6 +16,9 @@ class Player:
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return self.name
+
     @property
     def cards(self):
         self.logger.debug(
@@ -52,7 +55,7 @@ class Player:
     def assassinate(self, target):
         self.coins -= 3
 
-    def steal(self, target):
+    def steal(self):
         self.coins += 2
 
     async def exchange(self, deck: Deck):

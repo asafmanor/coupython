@@ -4,6 +4,12 @@ class Card:
     def __init__(self, idx: int):
         self.idx = idx
 
+    def __str__(self):
+        return f"{self.name}-{self.idx}"
+
+    def __repr__(self):
+        return f"{self.name}-{self.idx}"
+
 
 class CardList(list):
     def has(self, name):

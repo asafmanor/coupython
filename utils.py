@@ -22,6 +22,9 @@ class Action(enum.Enum):
     EXCHANGE = 5
     STEAL = 6
 
+    def __repr__(self):
+        return str(self)
+
 
 class CounterAction(enum.Enum):
     BLOCKFOREIGNAID = 0

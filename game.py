@@ -10,7 +10,7 @@ from random_player import RandomPlayer
 from utils import Action, CounterAction, IllegalActionError
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s | %(name)s | %(levelname)s | %(message)s')
 
 
 class Game:
@@ -46,13 +46,13 @@ class Game:
                 finally:
                     break
 
-                await self.do_action(action, player, target)
+            await self.do_action(player, action, target)
 
     # TODO this is hacky!
-    def get_first_caller(self, calls: Sequence[bool]) -> Player:
+    def get_first_caller(self, calls: Sequence[bool], callers: Sequence[Player]) -> Player:
         for idx, call in enumerate(calls):
             if call:
-                return self.players[idx]
+                return callers[idx]
 
     @staticmethod
     def finalize_call(caller: Player, called: Player, action: Action):
@@ -70,11 +70,12 @@ class Game:
             exit()
 
     async def do_action(self, source: Player, action: Action, target: Player):
+        adversaries = [player for player in self.players if player != source]
         calls = await asyncio.gather(
-            *[player.maybe_call(source, action) for player in self.players]
+            *[player.maybe_call(source, action) for player in adversaries]
         )
         if any(calls):
-            caller = get_first_caller(calls)
+            caller = self.get_first_caller(calls, adversaries)
             self.finalize_call(caller=caller, called=source, action=action)
 
         else:
@@ -85,11 +86,11 @@ class Game:
                 counter_actions = await asyncio.gather(
                     *[
                         player.counter_action(Action.FOREIGNAID, source)
-                        for player in self.players
+                        for player in adversaries
                     ]
                 )
                 if any(counter_actions):
-                    claimed_duke = self.get_first_caller(counter_actions)
+                    claimed_duke = self.get_first_caller(counter_actions, adversaries)
                     counter_call = await source.maybe_call(
                         claimed_duke, CounterAction.BLOCKFOREIGNAID
                     )
@@ -173,7 +174,6 @@ if __name__ == "__main__":
         RandomPlayer("Disco"),
     ]
     game = Game(players)
-    logger.info("Game was set up.")
     asyncio.run(game())
 
 """TODO:

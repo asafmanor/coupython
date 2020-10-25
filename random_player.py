@@ -55,7 +55,10 @@ def uniform_proactive_action(cards: CardList, players: Sequence[Player]) -> Acti
         Action.STEAL,
     ]
 
-    return random.choices(actions, weights=probs), random.choices(players)
+    action = random.choices(actions, weights=probs)[0]
+    target = random.choice(players) if action in [Action.COUP, Action.ASSASS, Action.STEAL] else None
+
+    return action, target
 
 
 def uniform_counter_action(
@@ -94,17 +97,17 @@ def uniform_counter_action(
         actions = [CounterAction.BLOCKASSASS, None]
         probs = [prob_BLOCKASSASS, 1 - prob_BLOCKASSASS]
 
-    return random.choices(actions, weights=probs)
+    return random.choices(actions, weights=probs)[0]
 
 
 class RandomPlayer(Player):
     async def _lose_influence(self) -> Card:
-        asyncio.sleep(get_time_for_move())
+        await asyncio.sleep(get_time_for_move())
         random.shuffle(self._cards)
         return self._cards.pop()
 
     async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
-        asyncio.sleep(get_time_for_move())
+        await asyncio.sleep(get_time_for_move())
         current_num_cards = len(self._cards)
         cards = self._cards + extra_cards
         random.shuffle(cards)
@@ -116,13 +119,13 @@ class RandomPlayer(Player):
         return return_cards
 
     async def _counter_action(self, action: Action, source: Player) -> CounterAction:
-        asyncio.sleep(get_time_for_move())
+        await asyncio.sleep(get_time_for_move())
         return uniform_counter_action(self._cards, action, source)
 
     async def _proactive_action(self, players: Sequence[Player]) -> (Action, Player):
-        asyncio.sleep(get_time_for_move())
+        await asyncio.sleep(get_time_for_move())
         return uniform_proactive_action(self._cards, players)
 
     async def _maybe_call(self, source, action: Action) -> bool:
-        asyncio.sleep(get_time_for_call())
-        return random.choices([True, False])
+        await asyncio.sleep(get_time_for_call())
+        return random.choices([True, False], [0.2, 0.8])[0]
