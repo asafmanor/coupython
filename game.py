@@ -5,15 +5,9 @@ from typing import Callable
 
 import numpy as np
 
-from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
-from utils import (
-    Action,
-    CounterAction,
-    EmptyDeckError,
-    IllegalActionError,
-    InsufficientFundsError,
-    TargetAction,
-)
+from cards import Ambassador, Assassin, Captain, Card, CardList, Contessa, Duke
+from utils import (Action, CounterAction, EmptyDeckError, IllegalActionError,
+                   InsufficientFundsError, TargetAction)
 
 
 class Deck:
@@ -37,7 +31,7 @@ class Deck:
             self.shuffle()
         return self.cards.pop()
 
-    def return_cards(self, *cards):
+    def return_cards(self, cards: CardList):
         self.cards += cards
 
     def __len__(self):
@@ -47,6 +41,7 @@ class Deck:
 class Player:
     # TODO: implement > 10 cards check
     # methods beginning with target_ are called when you are the target of an action
+    # Gaming logic should only be implemented in subclasses of Player
     def __init__(self, name: str):
         self.name = name
         self.cards: list = None
@@ -78,17 +73,21 @@ class Player:
         card_1 = deck.draw_card(shuffle=False)
         card_2 = deck.draw_card(shuffle=False)
         current_num_cards = len(self.cards)
-        await self._finalize_exchange(self, [card_1, card_2])
+        return_cards = await self._finalize_exchange(self, CardList([card_1, card_2]))
+        deck.return_cards(return_cards)
+
         if current_num_cards == len(self.cards):
             raise RuntimeError(
                 "Number of cards returned from _finalize_exchange "
                 + f"is inequivalent to {current_num_cards}"
             )
 
-    async def counter_action(self, action: Action, source):
+    async def counter_action(self, action: Action, source) -> Action:
         counter_action = await self._counter_action(action, source)
         if counter_action is not None:
             self.logger.info(f"Performed counter-action {counter_action}")
+
+        return counter_action
 
     async def target_assassinate(self, source):
         """Called when you the player is the target of an assassination."""
@@ -106,6 +105,9 @@ class Player:
 
         return counter_action
 
+    # TODO: need to rethink that. Maybe the check should be in a the target?
+    # Anyway, the "game" should handle the transfer of money.
+    # Maybe "steal" should not be an action of a player.
     def steal(self, target):
         if target.coins < 2:
             raise IllegalActionError(
@@ -121,14 +123,14 @@ class Player:
         discard.cards.append(card)
         return len(self.cards)
 
-    async def _lose_influence(self):
+    async def _lose_influence(self) -> Card:
         raise NotImplementedError
 
-    async def _finalize_exchange(self, extra_cards: list):
+    async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
-    async def _counter_action(self, action, source):
+    async def _counter_action(self, action: Action, source) -> Action:
         raise NotImplementedError
 
-    async def _proactive_action(self):
+    async def _proactive_action(self) -> Action:
         raise NotImplementedError

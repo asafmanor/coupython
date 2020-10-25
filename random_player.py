@@ -1,9 +1,9 @@
 import asyncio
 import random
 
-from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
-from utils import Action
+from cards import Ambassador, Assassin, Captain, Card, CardList, Contessa, Duke
 from game import Player
+from utils import Action
 
 
 def get_time_for_move():
@@ -62,25 +62,27 @@ def uniform_counter_action(cards: CardList) -> list:
 
 
 class RandomPlayer(Player):
-    async def _lose_influence(self):
+    async def _lose_influence(self) -> Card:
         asyncio.sleep(get_time_for_move())
         random.shuffle(self.cards)
         return self.cards.pop()
 
-    async def _finalize_exchange(self, extra_cards: list):
+    async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
         asyncio.sleep(get_time_for_move())
         current_num_cards = len(self.cards)
         cards = self.cards + extra_cards
         random.shuffle(cards)
-        cards.pop()
+        return_cards = [cards.pop()]
         if current_num_cards == 1:
-            cards.pop()
+            return_cards.append(cards.pop())
         self.cards = CardList(cards)
 
-    async def _counter_action(self, action, source):
+        return return_cards
+
+    async def _counter_action(self, action: Action, source: Player) -> Action:
         asyncio.sleep(get_time_for_move())
         raise NotImplementedError
 
-    async def _proactive_action(self):
+    async def _proactive_action(self) -> Action:
         asyncio.sleep(get_time_for_move())
         return uniform_proactive_action(self.cards)
