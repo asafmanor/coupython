@@ -1,13 +1,13 @@
 import asyncio
-import logging
 import random
-from typing import Callable
+from typing import Sequence
 
-import numpy as np
+from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
+from player import Player
+from utils import Action, EmptyDeckError, IllegalActionError, CounterAction
+import logging
 
-from cards import Ambassador, Assassin, Captain, Card, CardList, Contessa, Duke
-from utils import (Action, CounterAction, EmptyDeckError, IllegalActionError,
-                   InsufficientFundsError, TargetAction)
+logger = logging.getLogger(__name__)
 
 
 class Deck:
@@ -20,8 +20,16 @@ class Deck:
         cards += [Contessa(i) for i in range(3)]
         self.cards = CardList(cards)
 
+    @property
+    def cards(self):
+        raise IllegalActionError("Can't look at the Deck's cards.")
+
+    @cards.setter
+    def cards(self, cards):
+        self._cards = cards
+
     def shuffle(self):
-        random.shuffle(self.cards)
+        random.shuffle(self._cards)
 
     def draw_card(self, shuffle: bool = False):
         if len(self) == 0:
@@ -29,108 +37,168 @@ class Deck:
 
         if shuffle:
             self.shuffle()
-        return self.cards.pop()
+        return self._cards.pop()
 
     def return_cards(self, cards: CardList):
-        self.cards += cards
+        self._cards += cards
 
     def __len__(self):
-        return len(self.cards)
+        return len(self._cards)
 
 
-class Player:
-    # TODO: implement > 10 cards check
-    # methods beginning with target_ are called when you are the target of an action
-    # Gaming logic should only be implemented in subclasses of Player
-    def __init__(self, name: str):
-        self.name = name
-        self.cards: list = None
-        self.logger = logging.getLogger(name)
+class Game:
+    def __init__(self, players: Sequence[Player]):
+        self.players = players
+        self.deck = Deck()
+        self.discard_pile = CardList()
 
-    @property
-    def coins(self):
-        return self._coins
+    async def __call__(self):
+        self.deck.shuffle()
 
-    @coins.setter
-    def coins(self, value):
-        if value < 0:
-            raise InsufficientFundsError
-        self._coins = value
+        for player in self.players:
+            player.coins = 2
+            player.cards = CardList([self.deck.draw_card(), self.deck.draw_card()])
 
-    def take_3(self):
-        self.coins += 3
+        while True:
+            await self.turn()
 
-    def assassinate(self, target):
-        if self.coins < 3:
-            raise IllegalActionError("Can't execute Assasinate: not enough coins")
-        self.coins -= 3
-        # TODO target.target_assassinate() should be caleed from main loop
+    async def turn(self):
+        for player in self.players:
+            while True:
+                action, target = await player.proactive_action()
+                try:
+                    self.check_legal_action(action, player, target)
+                except IllegalActionError as err:
+                    logger.info(err)
+                    logger.info(
+                        f"Player {player} played the illegal action {action}. Re-playing"
+                    )
+                    continue
+                finally:
+                    break
 
-    async def exchange(self, deck: Deck):
-        if len(deck) < 2:
-            raise IllegalActionError("Can't execute Exchange: deck is empty")
+                self.do_action(action, player, target)
 
-        card_1 = deck.draw_card(shuffle=False)
-        card_2 = deck.draw_card(shuffle=False)
-        current_num_cards = len(self.cards)
-        return_cards = await self._finalize_exchange(self, CardList([card_1, card_2]))
-        deck.return_cards(return_cards)
+    # TODO this is hacky!
+    def get_first_caller(self, calls: Sequence[bool]) -> Player:
+        for idx, call in enumerate(calls):
+            if call:
+                return self.players[idx]
 
-        if current_num_cards == len(self.cards):
-            raise RuntimeError(
-                "Number of cards returned from _finalize_exchange "
-                + f"is inequivalent to {current_num_cards}"
-            )
+    @staticmethod
+    def finalize_call(caller: Player, called: Player, action: Action):
+        logger.info("There were calls... skipping...")
 
-    async def counter_action(self, action: Action, source) -> Action:
-        counter_action = await self._counter_action(action, source)
-        if counter_action is not None:
-            self.logger.info(f"Performed counter-action {counter_action}")
+    def remove_player(self, removed: Player):
+        for idx, player in enumerate(self.players):
+            if player == removed:
+                self.players.pop(idx)
+                logger.info(f"Player {player} was removed from the game.")
+                logger.debug(f"List of players: {self.players}")
 
-        return counter_action
+        if len(self.players == 1):
+            logger.info(f"Player {player} has won the game!")
+            exit()
 
-    async def target_assassinate(self, source):
-        """Called when you the player is the target of an assassination."""
-        counter_action = await self.counter_action(TargetAction.ASSA_AS_TARGET, source)
-        if counter_action is None:
-            self.lose_influence()
+    async def do_action(self, source: Player, action: Action, target: Player):
+        calls = await asyncio.gather(
+            *[player.maybe_call(source, action) for player in self.players]
+        )
+        if any(calls):
+            caller = get_first_caller(calls)
+            self.finalize_call(caller=caller, called=source, action=action)
 
-        return counter_action
+        else:
+            if action == Action.INCOME:
+                source.income()
 
-    async def target_steal(self, source):
-        """Called when you the player is the target of stealing."""
-        counter_action = await self.counter_action(TargetAction.STEAL_AS_TARGET, source)
-        if counter_action is None:
-            self.coins -= 2
+            elif action == Action.FOREIGNAID:
+                counter_actions = await asyncio.gather(
+                    *[
+                        player.counter_action(Action.FOREIGNAID, source)
+                        for player in self.players
+                    ]
+                )
+                if any(counter_actions):
+                    claimed_duke = self.get_first_caller(counter_actions)
+                    counter_call = await source.maybe_call(
+                        claimed_duke, CounterAction.BLOCKFOREIGNAID
+                    )
+                    if counter_call:
+                        self.finalize_call(
+                            caller=source,
+                            called=claimed_duke,
+                            action=CounterAction.BLOCKFOREIGNAID,
+                        )
 
-        return counter_action
+                else:
+                    source.foreign_aid()
 
-    # TODO: need to rethink that. Maybe the check should be in a the target?
-    # Anyway, the "game" should handle the transfer of money.
-    # Maybe "steal" should not be an action of a player.
-    def steal(self, target):
-        if target.coins < 2:
-            raise IllegalActionError(
-                f"Can't steal from {target.name}: s/he has insufficient funds."
-            )
+            elif action == Action.COUP:
+                source.coup()
+                target.lose_influence()
 
-        # TODO target.target_steal() should be called from main loop
-        self.coins += 2
+                if len(target.cards) == 0:
+                    self.remove_player(target)
 
-    def lose_influence(self, discard) -> int:
-        card = self._lose_influence()
-        self.logger.info(f"Lost a {card.name} influence")
-        discard.cards.append(card)
-        return len(self.cards)
+            elif action == Action.TAX:
+                source.tax()
 
-    async def _lose_influence(self) -> Card:
-        raise NotImplementedError
+            elif action == Action.ASSASS:
+                ca = await target.target_assassinate(source, self.discard_pile)
+                if ca:
+                    counter_call = await source.maybe_call(
+                        target, CounterAction.BLOCKASSASS
+                    )
+                    if counter_call:
+                        self.finalize_call(
+                            caller=source,
+                            called=target,
+                            action=CounterAction.BLOCKASSASS,
+                        )
 
-    async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
-        raise NotImplementedError
+                else:
+                    source.assassinate()
+                    if len(target.cards) == 0:
+                        self.remove_player(target)
 
-    async def _counter_action(self, action: Action, source) -> Action:
-        raise NotImplementedError
+            elif action == Action.EXCHANGE:
+                source.exchange(self.deck)
 
-    async def _proactive_action(self) -> Action:
-        raise NotImplementedError
+            elif action == Action.STEAL:
+                ca = await target.target_steal(source)
+                if ca:
+                    counter_call = await source.maybe_call(
+                        target, CounterAction.BLOCKSTEAL
+                    )
+                    if counter_call:
+                        self.finalize_call(
+                            caller=source,
+                            called=target,
+                            action=CounterAction.BLOCKSTEAL,
+                        )
+
+                else:
+                    source.steal()
+
+    def check_legal_action(self, action: Action, player: Player, target: Player):
+        if action == Action.COUP and player.coins < 7:
+            raise IllegalActionError("Can't execute Coup: not enough coins.")
+        elif action == Action.ASSASS and player.coins < 3:
+            raise IllegalActionError("Can't execute Assassination: not enough coins.")
+        elif action == Action.EXCHANGE and len(self.deck) < 2:
+            raise IllegalActionError("Can't execute Exchange: deck is empty.")
+        elif action == Action.STEAL and target.coins < 2:
+            raise IllegalActionError(f"Can't steal from {target}. Not enough coins.")
+        elif player.coins > 10 and Action != Action.COUP:
+            raise IllegalActionError(f"{player} Must perform COUP!")
+
+        # TODO add assertions that target is None if it should be.
+
+
+"""TODO:
+- block stealing - must state using what card
+- implement finalize_call()
+- implement get_first_caller() using async
+- make all counterable actions use the same method for solving calls
+"""
