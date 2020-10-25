@@ -1,58 +1,27 @@
 import asyncio
-import random
+import logging
+import sys
 from typing import Sequence
 
-from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
+from cards import CardList
+from deck import Deck
 from player import Player
-from utils import Action, EmptyDeckError, IllegalActionError, CounterAction
-import logging
+from random_player import RandomPlayer
+from utils import Action, CounterAction, IllegalActionError
 
 logger = logging.getLogger(__name__)
-
-
-class Deck:
-    def __init__(self):
-        """Create a new 15 cards deck."""
-        cards = [Duke(i) for i in range(3)]
-        cards += [Assassin(i) for i in range(3)]
-        cards += [Ambassador(i) for i in range(3)]
-        cards += [Captain(i) for i in range(3)]
-        cards += [Contessa(i) for i in range(3)]
-        self.cards = CardList(cards)
-
-    @property
-    def cards(self):
-        raise IllegalActionError("Can't look at the Deck's cards.")
-
-    @cards.setter
-    def cards(self, cards):
-        self._cards = cards
-
-    def shuffle(self):
-        random.shuffle(self._cards)
-
-    def draw_card(self, shuffle: bool = False):
-        if len(self) == 0:
-            raise EmptyDeckError
-
-        if shuffle:
-            self.shuffle()
-        return self._cards.pop()
-
-    def return_cards(self, cards: CardList):
-        self._cards += cards
-
-    def __len__(self):
-        return len(self._cards)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 
 class Game:
     def __init__(self, players: Sequence[Player]):
+        logger.info(f"Game is set up with {players}")
         self.players = players
         self.deck = Deck()
         self.discard_pile = CardList()
 
     async def __call__(self):
+        logger.info("Game starting.")
         self.deck.shuffle()
 
         for player in self.players:
@@ -65,7 +34,7 @@ class Game:
     async def turn(self):
         for player in self.players:
             while True:
-                action, target = await player.proactive_action()
+                action, target = await player.proactive_action(self.players)
                 try:
                     self.check_legal_action(action, player, target)
                 except IllegalActionError as err:
@@ -77,7 +46,7 @@ class Game:
                 finally:
                     break
 
-                self.do_action(action, player, target)
+                await self.do_action(action, player, target)
 
     # TODO this is hacky!
     def get_first_caller(self, calls: Sequence[bool]) -> Player:
@@ -136,7 +105,7 @@ class Game:
 
             elif action == Action.COUP:
                 source.coup()
-                target.lose_influence()
+                await target.target_coup(self.discard_pile)
 
                 if len(target.cards) == 0:
                     self.remove_player(target)
@@ -163,7 +132,7 @@ class Game:
                         self.remove_player(target)
 
             elif action == Action.EXCHANGE:
-                source.exchange(self.deck)
+                await source.exchange(self.deck)
 
             elif action == Action.STEAL:
                 ca = await target.target_steal(source)
@@ -195,6 +164,17 @@ class Game:
 
         # TODO add assertions that target is None if it should be.
 
+
+if __name__ == "__main__":
+    players = [
+        RandomPlayer("Acapella"),
+        RandomPlayer("Boogy"),
+        RandomPlayer("Classic"),
+        RandomPlayer("Disco"),
+    ]
+    game = Game(players)
+    logger.info("Game was set up.")
+    asyncio.run(game())
 
 """TODO:
 - block stealing - must state using what card

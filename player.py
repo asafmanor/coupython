@@ -1,7 +1,7 @@
 import logging
 
 from cards import Card, CardList
-from game import Deck
+from deck import Deck
 from utils import Action, IllegalActionError, InsufficientFundsError
 
 
@@ -74,7 +74,7 @@ class Player:
         if action in [Action.INCOME, Action.COUP]:
             return False
 
-        calling = self._maybe_call(source, action)
+        calling = await self._maybe_call(source, action)
         if calling:
             self.logger.info(f"Called action {action} of player {source}")
         return calling
@@ -97,7 +97,7 @@ class Player:
         """Called when you the player is the target of an assassination."""
         counter_action = await self.counter_action(Action.ASSASS, source)
         if not counter_action:
-            self.lose_influence(discard_pile)
+            await self.lose_influence(discard_pile)
 
         return counter_action
 
@@ -109,11 +109,11 @@ class Player:
 
         return counter_action
 
-    def target_coup(self, discard_pile: CardList):
-        return self.lose_influence(discard_pile)
+    async def target_coup(self, discard_pile: CardList):
+        return await self.lose_influence(discard_pile)
 
-    def lose_influence(self, discard_pile: CardList) -> int:
-        card = self._lose_influence()
+    async def lose_influence(self, discard_pile: CardList) -> int:
+        card = await self._lose_influence()
         self.logger.info(f"Lost a {card.name} influence")
         discard_pile.append(card)
         return len(self._cards)

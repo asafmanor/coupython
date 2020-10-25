@@ -1,7 +1,5 @@
 import enum
 
-from game import Deck, Player
-
 
 class InsufficientFundsError(Exception):
     pass

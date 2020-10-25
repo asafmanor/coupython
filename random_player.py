@@ -3,7 +3,7 @@ import random
 from typing import Sequence
 
 from cards import Card, CardList
-from game import Player
+from player import Player
 from utils import Action, CounterAction
 
 
@@ -55,7 +55,7 @@ def uniform_proactive_action(cards: CardList, players: Sequence[Player]) -> Acti
         Action.STEAL,
     ]
 
-    return random.choice(actions, weights=probs), random.choice(players)
+    return random.choices(actions, weights=probs), random.choices(players)
 
 
 def uniform_counter_action(
@@ -94,7 +94,7 @@ def uniform_counter_action(
         actions = [CounterAction.BLOCKASSASS, None]
         probs = [prob_BLOCKASSASS, 1 - prob_BLOCKASSASS]
 
-    return random.choice(actions, weights=probs)
+    return random.choices(actions, weights=probs)
 
 
 class RandomPlayer(Player):
@@ -121,8 +121,8 @@ class RandomPlayer(Player):
 
     async def _proactive_action(self, players: Sequence[Player]) -> (Action, Player):
         asyncio.sleep(get_time_for_move())
-        return uniform_proactive_action(self._cards)
+        return uniform_proactive_action(self._cards, players)
 
     async def _maybe_call(self, source, action: Action) -> bool:
         asyncio.sleep(get_time_for_call())
-        return random.choice([True, False])
+        return random.choices([True, False])
