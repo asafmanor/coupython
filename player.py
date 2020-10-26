@@ -5,8 +5,7 @@ from typing import Sequence
 
 from action import Action
 from cards import Card, CardList
-from deck import Deck
-from game import CheatingError
+from deck import Deck, CheatingError
 
 
 class InsufficientFundsError(Exception):
@@ -49,10 +48,10 @@ class Player:
         self._coins = value
 
     def has(self, card_name: str) -> bool:
-        return self.cards.has(card_name)
+        return self._cards.has(card_name)
 
     def get(self, card_name: str) -> Card:
-        return self.cards.get(card_name)
+        return self._cards.get(card_name)
 
     def income(self):
         self.coins += 1
@@ -75,7 +74,7 @@ class Player:
     def replace(self, card_name: str, deck: Deck):
         deck.return_cards(CardList([self.get(card_name)]))
         deck.shuffle()
-        self.cards.append(deck.draw_card())
+        self._cards.append(deck.draw_card())
 
     async def exchange(self, deck: Deck):
         card_1 = deck.draw_card()
@@ -86,14 +85,14 @@ class Player:
         deck.return_cards(return_cards)
         deck.shuffle()
 
-        if current_num_cards == len(self._cards):
+        if current_num_cards != len(self._cards):
             raise RuntimeError(
                 "Number of cards returned from _finalize_exchange "
                 + f"is inequivalent to {current_num_cards}"
             )
 
     async def maybe_call(self, source, action: Action) -> bool:
-        if action in [Action.INCOME, Action.COUP]:
+        if action in [Action.INCOME, Action.FOREIGNAID, Action.COUP]:
             return False
 
         calling = await self._maybe_call(source, action)
@@ -103,7 +102,10 @@ class Player:
 
     async def proactive_action(self, players: Sequence[Player]) -> (Action, None):
         action, target = await self._proactive_action(players)
-        self.logger.info(f"Attempts action {action} on player {target}")
+        if target is not None:
+            self.logger.info(f"Attempts action {action} on player {target}")
+        else:
+            self.logger.info(f"Attempts action {action}")
 
         return action, target
 

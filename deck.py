@@ -2,9 +2,12 @@ import logging
 import random
 
 from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
-from game import CheatingError
 
 logger = logging.getLogger(__name__)
+
+
+class CheatingError(Exception):
+    pass
 
 
 class EmptyDeckError(Exception):

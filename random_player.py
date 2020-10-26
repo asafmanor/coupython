@@ -8,13 +8,11 @@ from action import Action, CounterAction, check_legal_action, IllegalActionError
 
 
 def get_time_for_move():
-    return 1
+    return 0.0
 
 
 def get_time_for_call():
-    return 2
-
-
+    return 0.0
 
 
 def uniform_counter_action(
@@ -64,12 +62,9 @@ class RandomPlayer(Player):
 
     async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
         await asyncio.sleep(get_time_for_move())
-        current_num_cards = len(self._cards)
         cards = self._cards + extra_cards
         random.shuffle(cards)
-        return_cards = [cards.pop()]
-        if current_num_cards == 1:
-            return_cards.append(cards.pop())
+        return_cards = [cards.pop(), cards.pop()]
         self._cards = CardList(cards)
 
         return return_cards
@@ -84,7 +79,7 @@ class RandomPlayer(Player):
 
     async def _maybe_call(self, source, action: Action) -> bool:
         await asyncio.sleep(get_time_for_call())
-        return random.choices([True, False], [0.05, 0.95])[0]
+        return random.choices([True, False], [0.1, 0.9])[0]
 
     def uniform_proactive_action(self, players: Sequence[Player]) -> Action:
         VALID_FACTOR = 2
@@ -97,13 +92,13 @@ class RandomPlayer(Player):
         prob_EX = 1
         prob_STEAL = 1
 
-        if self.cards.has("Duke"):
+        if self._cards.has("Duke"):
             prob_TAX *= VALID_FACTOR
-        if self.cards.has("Assassin"):
+        if self._cards.has("Assassin"):
             prob_ASSASS *= VALID_FACTOR
-        if self.cards.has("Ambassador"):
+        if self._cards.has("Ambassador"):
             prob_EX *= VALID_FACTOR
-        if self.cards.has("Captain"):
+        if self._cards.has("Captain"):
             prob_STEAL *= VALID_FACTOR
 
         probs = [
@@ -126,8 +121,7 @@ class RandomPlayer(Player):
             Action.STEAL,
         ]
 
-        action_is_illegal = True
-        while action_is_illegal:
+        while True:
             action = random.choices(actions, weights=probs)[0]
             target = (
                 random.choice(players)
@@ -136,6 +130,8 @@ class RandomPlayer(Player):
             )
             try:
                 check_legal_action(action, self, target)
+            except IllegalActionError:
+                continue
             except StopIteration:
                 break
 

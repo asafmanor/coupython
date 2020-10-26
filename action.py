@@ -1,5 +1,4 @@
 import enum
-from player import Player
 from deck import Deck
 
 
@@ -17,7 +16,10 @@ class Action(enum.Enum):
     STEAL = 6
 
     def __repr__(self):
-        return str(self)
+        return self.name
+
+    def __str__(self):
+        return self.name
 
 
 class CounterAction(enum.Enum):
@@ -27,7 +29,7 @@ class CounterAction(enum.Enum):
 
 
 def check_legal_action(
-    action: Action, player: Player, target: Player, deck: Deck = None
+    action: Action, player, target, deck: Deck = None
 ):
     """If action is illegal, IllegalActionError is raised. Otherwise, StopIteration is raised."""
 
@@ -37,7 +39,7 @@ def check_legal_action(
         raise IllegalActionError("Can't execute Assassination: not enough coins.")
     elif action == Action.STEAL and target.coins < 2:
         raise IllegalActionError(f"Can't steal from {target}. Not enough coins.")
-    elif player.coins > 10 and Action != Action.COUP:
+    elif player.coins > 10 and action != Action.COUP:
         raise IllegalActionError(f"{player} Must perform COUP!")
 
     if action == Action.EXCHANGE and deck is not None and len(deck) < 2:

@@ -15,12 +15,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.DEBUG,
-    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
 )
-
-
-class CheatingError(Exception):
-    pass
 
 
 class Game:
@@ -43,8 +39,7 @@ class Game:
 
     async def turn(self):
         for player in self.players:
-            action_is_illegal = True
-            while action_is_illegal:
+            while True:
                 action, target = await player.proactive_action(self.players)
                 try:
                     check_legal_action(action, player, target, self.deck)
@@ -54,11 +49,10 @@ class Game:
                         f"Player {player} played the illegal action {action}. Re-playing."
                     )
                 except StopIteration:
-                    action_is_illegal = False
+                    break
 
             await self.do_action(player, action, target)
 
-    # TODO this is hacky!
     def get_first_caller(
         self, calls: Sequence[bool], callers: Sequence[Player]
     ) -> Player:
@@ -66,14 +60,20 @@ class Game:
             if call:
                 return callers[idx]
 
-    def finalize_call(self, caller: Player, called: Player, action: Action):
+    async def finalize_call(self, caller: Player, called: Player, action: Action):
 
-        def solve(card_name: str):
+        logger.info(f"{caller} called {called} on action {action}")
+
+        async def solve(card_name: str):
             if called.has(card_name):
                 called.replace(card_name, self.deck)
-                caller.lose_influence(self.discard_pile)
+                await caller.lose_influence(self.discard_pile)
+                if (len(caller._cards) == 0):  # TODO, don't use caller._cards, find a better way
+                    self.remove_player(caller)
             else:
-                called.lose_influence(self.discard_pile)
+                await called.lose_influence(self.discard_pile)
+                if (len(called._cards) == 0):  # TODO, don't use called._cards, find a better way
+                    self.remove_player(called)
 
         if action == Action.INCOME:
             raise RuntimeError("INCOME Action was called.")
@@ -82,13 +82,15 @@ class Game:
         elif action == Action.COUP:
             raise RuntimeError("COUP Action was called.")
         elif action == Action.TAX:
-            solve("Duke")
+            await solve("Duke")
         elif action == Action.ASSASS:
-            solve("Assassin")
+            await solve("Assassin")
         elif action == Action.EXCHANGE:
-            solve("Ambassador")
+            await solve("Ambassador")
         elif action == Action.STEAL:
-            solve("Captain")
+            await solve("Captain")
+
+        # TODO: implement solving from counter actions
 
         logger.info("There were calls... skipping...")
 
@@ -99,7 +101,7 @@ class Game:
                 logger.info(f"Player {player} was removed from the game.")
                 logger.debug(f"List of players: {self.players}")
 
-        if len(self.players == 1):
+        if len(self.players) == 1:
             logger.info(f"Player {player} has won the game!")
             exit()
 
@@ -110,7 +112,7 @@ class Game:
         )
         if any(calls):
             caller = self.get_first_caller(calls, adversaries)
-            self.finalize_call(caller=caller, called=source, action=action)
+            await self.finalize_call(caller=caller, called=source, action=action)
 
         else:
             if action == Action.INCOME:
@@ -129,7 +131,7 @@ class Game:
                         claimed_duke, CounterAction.BLOCKFOREIGNAID
                     )
                     if counter_call:
-                        self.finalize_call(
+                        await self.finalize_call(
                             caller=source,
                             called=claimed_duke,
                             action=CounterAction.BLOCKFOREIGNAID,
@@ -142,7 +144,7 @@ class Game:
                 source.coup()
                 await target.target_coup(self.discard_pile)
 
-                if len(target.cards) == 0:
+                if len(target._cards) == 0:  # TODO implement without _cards
                     self.remove_player(target)
 
             elif action == Action.TAX:
@@ -155,7 +157,7 @@ class Game:
                         target, CounterAction.BLOCKASSASS
                     )
                     if counter_call:
-                        self.finalize_call(
+                        await self.finalize_call(
                             caller=source,
                             called=target,
                             action=CounterAction.BLOCKASSASS,
@@ -178,7 +180,7 @@ class Game:
                         target, CounterAction.BLOCKSTEAL
                     )
                     if counter_call:
-                        self.finalize_call(
+                        await self.finalize_call(
                             caller=source,
                             called=target,
                             action=CounterAction.BLOCKSTEAL,
