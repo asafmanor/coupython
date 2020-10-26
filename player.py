@@ -1,8 +1,12 @@
-import logging
+from __future__ import annotations
 
+import logging
+from typing import Sequence
+
+from action import Action
 from cards import Card, CardList
 from deck import Deck
-from action import Action, IllegalActionError
+from game import CheatingError
 
 
 class InsufficientFundsError(Exception):
@@ -28,14 +32,14 @@ class Player:
         self.logger.debug(
             "Cards can't be accessed. If the cards must be accessed, use `self._cards`"
         )
-        raise IllegalActionError("Can't look at a player's cards.")
+        raise CheatingError("Can't look at a player's cards.")
 
     @cards.setter
-    def cards(self, cards):
+    def cards(self, cards: CardList):
         self._cards = cards
 
     @property
-    def coins(self):
+    def coins(self) -> int:
         return self._coins
 
     @coins.setter
@@ -43,6 +47,12 @@ class Player:
         if value < 0:
             raise InsufficientFundsError
         self._coins = value
+
+    def has(self, card_name: str) -> bool:
+        return self.cards.has(card_name)
+
+    def get(self, card_name: str) -> Card:
+        return self.cards.get(card_name)
 
     def income(self):
         self.coins += 1
@@ -62,9 +72,14 @@ class Player:
     def steal(self):
         self.coins += 2
 
+    def replace(self, card_name: str, deck: Deck):
+        deck.return_cards(CardList([self.get(card_name)]))
+        deck.shuffle()
+        self.cards.append(deck.draw_card())
+
     async def exchange(self, deck: Deck):
-        card_1 = deck.draw_card(shuffle=False)
-        card_2 = deck.draw_card(shuffle=False)
+        card_1 = deck.draw_card()
+        card_2 = deck.draw_card()
         current_num_cards = len(self._cards)
         return_cards = await self._finalize_exchange(CardList([card_1, card_2]))
 
@@ -86,13 +101,13 @@ class Player:
             self.logger.info(f"Called action {action} of player {source}")
         return calling
 
-    async def proactive_action(self, players) -> (Action, None):
+    async def proactive_action(self, players: Sequence[Player]) -> (Action, None):
         action, target = await self._proactive_action(players)
         self.logger.info(f"Attempts action {action} on player {target}")
 
         return action, target
 
-    async def counter_action(self, action: Action, source) -> bool:
+    async def counter_action(self, action: Action, source: Player) -> bool:
         counter_action = await self._counter_action(action, source)
         if counter_action is not None:
             self.logger.info(f"Performed counter-action {counter_action}")
@@ -100,7 +115,7 @@ class Player:
 
         return False
 
-    async def target_assassinate(self, source, discard_pile: CardList) -> bool:
+    async def target_assassinate(self, source: Player, discard_pile: CardList) -> bool:
         """Called when you the player is the target of an assassination."""
         counter_action = await self.counter_action(Action.ASSASS, source)
         if not counter_action:
@@ -108,7 +123,7 @@ class Player:
 
         return counter_action
 
-    async def target_steal(self, source) -> bool:
+    async def target_steal(self, source: Player) -> bool:
         """Called when you the player is the target of stealing."""
         counter_action = await self.counter_action(Action.STEAL, source)
         if counter_action is None:
@@ -131,13 +146,13 @@ class Player:
     async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
-    async def _counter_action(self, action: Action, source) -> Action:
+    async def _counter_action(self, action: Action, source: Player) -> Action:
         raise NotImplementedError
 
     async def _proactive_action(
-        self, players
+        self, players: Sequence[Player]
     ) -> (Action, None):  # Actually, returns a different player
         raise NotImplementedError
 
-    async def _maybe_call(self, source, action: Action) -> bool:
+    async def _maybe_call(self, source: Player, action: Action) -> bool:
         raise NotImplementedError

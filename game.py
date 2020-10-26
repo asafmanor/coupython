@@ -19,6 +19,10 @@ logging.basicConfig(
 )
 
 
+class CheatingError(Exception):
+    pass
+
+
 class Game:
     def __init__(self, players: Sequence[Player]):
         logger.info(f"Game is set up with {players}")
@@ -62,8 +66,30 @@ class Game:
             if call:
                 return callers[idx]
 
-    @staticmethod
-    def finalize_call(caller: Player, called: Player, action: Action):
+    def finalize_call(self, caller: Player, called: Player, action: Action):
+
+        def solve(card_name: str):
+            if called.has(card_name):
+                called.replace(card_name, self.deck)
+                caller.lose_influence(self.discard_pile)
+            else:
+                called.lose_influence(self.discard_pile)
+
+        if action == Action.INCOME:
+            raise RuntimeError("INCOME Action was called.")
+        elif action == Action.FOREIGNAID:
+            raise RuntimeError("FOREIGNAID Action was called.")
+        elif action == Action.COUP:
+            raise RuntimeError("COUP Action was called.")
+        elif action == Action.TAX:
+            solve("Duke")
+        elif action == Action.ASSASS:
+            solve("Assassin")
+        elif action == Action.EXCHANGE:
+            solve("Ambassador")
+        elif action == Action.STEAL:
+            solve("Captain")
+
         logger.info("There were calls... skipping...")
 
     def remove_player(self, removed: Player):
@@ -175,7 +201,8 @@ if __name__ == "__main__":
 """TODO:
 - block stealing - must state using what card
 - implement finalize_call()
-- implement get_first_caller() using async
+- implement get_first_caller() using async.wait()
 - make all counterable actions use the same method for solving calls
+- break Player.counter_action() into the different actions.
 - break do_action() so unit-tests can run on it
 """

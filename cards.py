@@ -12,11 +12,17 @@ class Card:
 
 
 class CardList(list):
-    def has(self, name):
+    def has(self, name: str):
         for x in self:
             if x.name == name:
                 return True
         return False
+
+    def get(self, name: str):
+        for idx, x in enumerate(self):
+            if x.name == name:
+                return self.pop(idx)
+        raise RuntimeError(f"CardList does not contain {name}")
 
 
 class Duke(Card):

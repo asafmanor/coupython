@@ -4,7 +4,7 @@ from typing import Sequence
 
 from cards import Card, CardList
 from player import Player
-from action import Action, CounterAction, check_legal_action
+from action import Action, CounterAction, check_legal_action, IllegalActionError
 
 
 def get_time_for_move():
@@ -15,54 +15,6 @@ def get_time_for_call():
     return 2
 
 
-def uniform_proactive_action(cards: CardList, players: Sequence[Player]) -> Action:
-    VALID_FACTOR = 2
-
-    prob_INCOME = 1
-    prob_FOREIGNAID = 1
-    prob_COUP = 1
-    prob_TAX = 1
-    prob_ASSASS = 1
-    prob_EX = 1
-    prob_STEAL = 1
-
-    if cards.has("Duke"):
-        prob_TAX *= VALID_FACTOR
-    if cards.has("Assassin"):
-        prob_ASSASS *= VALID_FACTOR
-    if cards.has("Ambassador"):
-        prob_EX *= VALID_FACTOR
-    if cards.has("Captain"):
-        prob_STEAL *= VALID_FACTOR
-
-    probs = [
-        prob_INCOME,
-        prob_FOREIGNAID,
-        prob_COUP,
-        prob_TAX,
-        prob_ASSASS,
-        prob_EX,
-        prob_STEAL,
-    ]
-
-    actions = [
-        Action.INCOME,
-        Action.FOREIGNAID,
-        Action.COUP,
-        Action.TAX,
-        Action.ASSASS,
-        Action.EXCHANGE,
-        Action.STEAL,
-    ]
-
-    action = random.choices(actions, weights=probs)[0]
-    target = (
-        random.choice(players)
-        if action in [Action.COUP, Action.ASSASS, Action.STEAL]
-        else None
-    )
-
-    return action, target
 
 
 def uniform_counter_action(
@@ -128,8 +80,63 @@ class RandomPlayer(Player):
 
     async def _proactive_action(self, players: Sequence[Player]) -> (Action, Player):
         await asyncio.sleep(get_time_for_move())
-        return uniform_proactive_action(self._cards, players)
+        return self.uniform_proactive_action(players)
 
     async def _maybe_call(self, source, action: Action) -> bool:
         await asyncio.sleep(get_time_for_call())
         return random.choices([True, False], [0.05, 0.95])[0]
+
+    def uniform_proactive_action(self, players: Sequence[Player]) -> Action:
+        VALID_FACTOR = 2
+
+        prob_INCOME = 1
+        prob_FOREIGNAID = 1
+        prob_COUP = 1
+        prob_TAX = 1
+        prob_ASSASS = 1
+        prob_EX = 1
+        prob_STEAL = 1
+
+        if self.cards.has("Duke"):
+            prob_TAX *= VALID_FACTOR
+        if self.cards.has("Assassin"):
+            prob_ASSASS *= VALID_FACTOR
+        if self.cards.has("Ambassador"):
+            prob_EX *= VALID_FACTOR
+        if self.cards.has("Captain"):
+            prob_STEAL *= VALID_FACTOR
+
+        probs = [
+            prob_INCOME,
+            prob_FOREIGNAID,
+            prob_COUP,
+            prob_TAX,
+            prob_ASSASS,
+            prob_EX,
+            prob_STEAL,
+        ]
+
+        actions = [
+            Action.INCOME,
+            Action.FOREIGNAID,
+            Action.COUP,
+            Action.TAX,
+            Action.ASSASS,
+            Action.EXCHANGE,
+            Action.STEAL,
+        ]
+
+        action_is_illegal = True
+        while action_is_illegal:
+            action = random.choices(actions, weights=probs)[0]
+            target = (
+                random.choice(players)
+                if action in [Action.COUP, Action.ASSASS, Action.STEAL]
+                else None
+            )
+            try:
+                check_legal_action(action, self, target)
+            except StopIteration:
+                break
+
+        return action, target
