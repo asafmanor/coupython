@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import sys
 from typing import Sequence
 
+from action import Action, CounterAction, check_legal_action
 from cards import CardList
 from deck import Deck
 from player import Player
 from random_player import RandomPlayer
-from action import Action, CounterAction, IllegalActionError, check_legal_action
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -17,6 +18,8 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
 )
+
+random.seed(0)
 
 
 class Game:
@@ -37,21 +40,19 @@ class Game:
         while True:
             await self.turn()
 
+            # Finalize game
+            if len(self.players) == 1:
+                logger.info(f"Player {self.players[0]} has won the game!")
+                return
+
     async def turn(self):
         for player in self.players:
-            while True:
-                action, target = await player.proactive_action(self.players)
-                try:
-                    check_legal_action(action, player, target, self.deck)
-                except IllegalActionError as err:
-                    logger.debug(err)
-                    logger.debug(
-                        f"Player {player} played the illegal action {action}. Re-playing."
-                    )
-                except StopIteration:
-                    break
-
-            await self.do_action(player, action, target)
+            # while True:
+            action, target = await player.proactive_action(self.players)
+            try:
+                check_legal_action(action, player, target, self.deck)
+            except StopIteration:
+                await self.do_action(player, action, target)
 
     def get_first_caller(
         self, calls: Sequence[bool], callers: Sequence[Player]
@@ -98,10 +99,6 @@ class Game:
                 self.players.pop(idx)
                 logger.info(f"Player {player} was removed from the game.")
                 logger.debug(f"List of players: {self.players}")
-
-        if len(self.players) == 1:
-            logger.info(f"Player {player} has won the game!")
-            exit()
 
     async def do_action(self, source: Player, action: Action, target: Player):
         adversaries = [player for player in self.players if player != source]
