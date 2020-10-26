@@ -11,7 +11,7 @@ def get_time_for_move():
     return 0.0
 
 
-def get_time_for_call():
+def get_time_for_challange():
     return 0.0
 
 
@@ -60,7 +60,7 @@ class RandomPlayer(Player):
         random.shuffle(self._cards)
         return self._cards.pop()
 
-    async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
+    async def _exchange(self, extra_cards: CardList) -> CardList:
         await asyncio.sleep(get_time_for_move())
         cards = self._cards + extra_cards
         random.shuffle(cards)
@@ -77,8 +77,8 @@ class RandomPlayer(Player):
         await asyncio.sleep(get_time_for_move())
         return self.uniform_proactive_action(players)
 
-    async def _maybe_call(self, source, action: Action) -> bool:
-        await asyncio.sleep(get_time_for_call())
+    async def _maybe_challenge(self, source, action: Action) -> bool:
+        await asyncio.sleep(get_time_for_challange())
         return random.choices([True, False], [0.1, 0.9])[0]
 
     def uniform_proactive_action(self, players: Sequence[Player]) -> Action:

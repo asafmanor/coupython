@@ -80,25 +80,25 @@ class Player:
         card_1 = deck.draw_card()
         card_2 = deck.draw_card()
         current_num_cards = len(self._cards)
-        return_cards = await self._finalize_exchange(CardList([card_1, card_2]))
+        return_cards = await self._exchange(CardList([card_1, card_2]))
 
         deck.return_cards(return_cards)
         deck.shuffle()
 
         if current_num_cards != len(self._cards):
             raise RuntimeError(
-                "Number of cards returned from _finalize_exchange "
+                "Number of cards returned from _exchange "
                 + f"is inequivalent to {current_num_cards}"
             )
 
-    async def maybe_call(self, source, action: Action) -> bool:
+    async def maybe_challenge(self, source, action: Action) -> bool:
         if action in [Action.INCOME, Action.FOREIGNAID, Action.COUP]:
             return False
 
-        calling = await self._maybe_call(source, action)
-        if calling:
-            self.logger.info(f"Called action {action} of player {source}")
-        return calling
+        challange = await self._maybe_challenge(source, action)
+        if challange:
+            self.logger.info(f"Challanged action {action} of player {source}")
+        return challange
 
     async def proactive_action(self, players: Sequence[Player]) -> (Action, None):
         action, target = await self._proactive_action(players)
@@ -145,7 +145,7 @@ class Player:
     async def _lose_influence(self) -> Card:
         raise NotImplementedError
 
-    async def _finalize_exchange(self, extra_cards: CardList) -> CardList:
+    async def _exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
     async def _counter_action(self, action: Action, source: Player) -> Action:
@@ -156,5 +156,5 @@ class Player:
     ) -> (Action, None):  # Actually, returns a different player
         raise NotImplementedError
 
-    async def _maybe_call(self, source: Player, action: Action) -> bool:
+    async def _maybe_challenge(self, source: Player, action: Action) -> bool:
         raise NotImplementedError

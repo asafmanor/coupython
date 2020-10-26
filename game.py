@@ -54,34 +54,34 @@ class Game:
             except StopIteration:
                 await self.do_action(player, action, target)
 
-    def get_first_caller(
-        self, calls: Sequence[bool], callers: Sequence[Player]
+    def get_first_challenger(
+        self, challenges: Sequence[bool], challengers: Sequence[Player]
     ) -> Player:
-        for idx, call in enumerate(calls):
+        for idx, call in enumerate(challenges):
             if call:
-                return callers[idx]
+                return challengers[idx]
 
-    async def finalize_call(self, caller: Player, called: Player, action: Action):
+    async def finalize_challenge(self, challenger: Player, challenged: Player, action: Action):
 
         async def solve(card_name: str):
-            if called.has(card_name):
-                logger.info(f"{called} has the card {card_name}!")
-                called.replace(card_name, self.deck)
-                await caller.lose_influence(self.discard_pile)
-                if (len(caller._cards) == 0):  # TODO, don't use caller._cards, find a better way
-                    self.remove_player(caller)
+            if challenged.has(card_name):
+                logger.info(f"{challenged} has the card {card_name}!")
+                challenged.replace(card_name, self.deck)
+                await challenger.lose_influence(self.discard_pile)
+                if (len(challenger._cards) == 0):  # TODO, don't use challenger._cards, find a better way
+                    self.remove_player(challenger)
             else:
-                logger.info(f"{called} does not have the card {card_name}!")
-                await called.lose_influence(self.discard_pile)
-                if (len(called._cards) == 0):  # TODO, don't use called._cards, find a better way
-                    self.remove_player(called)
+                logger.info(f"{challenged} does not have the card {card_name}!")
+                await challenged.lose_influence(self.discard_pile)
+                if (len(challenged._cards) == 0):  # TODO, don't use challenged._cards, find a better way
+                    self.remove_player(challenged)
 
         if action == Action.INCOME:
-            raise RuntimeError("INCOME Action was called.")
+            raise RuntimeError("INCOME Action was challenged.")
         elif action == Action.FOREIGNAID:
-            raise RuntimeError("FOREIGNAID Action was called.")
+            raise RuntimeError("FOREIGNAID Action was challenged.")
         elif action == Action.COUP:
-            raise RuntimeError("COUP Action was called.")
+            raise RuntimeError("COUP Action was challenged.")
         elif action == Action.TAX:
             await solve("Duke")
         elif action == Action.ASSASS:
@@ -102,12 +102,12 @@ class Game:
 
     async def do_action(self, source: Player, action: Action, target: Player):
         adversaries = [player for player in self.players if player != source]
-        calls = await asyncio.gather(
-            *[player.maybe_call(source, action) for player in adversaries]
+        challenges = await asyncio.gather(
+            *[player.maybe_challenge(source, action) for player in adversaries]
         )
-        if any(calls):
-            caller = self.get_first_caller(calls, adversaries)
-            await self.finalize_call(caller=caller, called=source, action=action)
+        if any(challenges):
+            challenger = self.get_first_challenger(challenges, adversaries)
+            await self.finalize_challenge(challenger=challenger, challenged=source, action=action)
 
         else:
             if action == Action.INCOME:
@@ -121,14 +121,14 @@ class Game:
                     ]
                 )
                 if any(counter_actions):
-                    claimed_duke = self.get_first_caller(counter_actions, adversaries)
-                    counter_call = await source.maybe_call(
+                    claimed_duke = self.get_first_challenger(counter_actions, adversaries)
+                    counter_challenge = await source.maybe_challenge(
                         claimed_duke, CounterAction.BLOCKFOREIGNAID
                     )
-                    if counter_call:
-                        await self.finalize_call(
-                            caller=source,
-                            called=claimed_duke,
+                    if counter_challenge:
+                        await self.finalize_challenge(
+                            challenger=source,
+                            challenged=claimed_duke,
                             action=CounterAction.BLOCKFOREIGNAID,
                         )
 
@@ -148,13 +148,13 @@ class Game:
             elif action == Action.ASSASS:
                 ca = await target.target_assassinate(source, self.discard_pile)
                 if ca:
-                    counter_call = await source.maybe_call(
+                    counter_challenge = await source.maybe_challenge(
                         target, CounterAction.BLOCKASSASS
                     )
-                    if counter_call:
-                        await self.finalize_call(
-                            caller=source,
-                            called=target,
+                    if counter_challenge:
+                        await self.finalize_challenge(
+                            challenger=source,
+                            challenged=target,
                             action=CounterAction.BLOCKASSASS,
                         )
 
@@ -171,13 +171,13 @@ class Game:
             elif action == Action.STEAL:
                 ca = await target.target_steal(source)
                 if ca:
-                    counter_call = await source.maybe_call(
+                    counter_challenge = await source.maybe_challenge(
                         target, CounterAction.BLOCKSTEAL
                     )
-                    if counter_call:
-                        await self.finalize_call(
-                            caller=source,
-                            called=target,
+                    if counter_challenge:
+                        await self.finalize_challenge(
+                            challenger=source,
+                            challenged=target,
                             action=CounterAction.BLOCKSTEAL,
                         )
 
@@ -197,9 +197,9 @@ if __name__ == "__main__":
 
 """TODO:
 - block stealing - must state using what card
-- implement finalize_call() for counter-actions
-- implement get_first_caller() using async.wait()
-- make all counterable actions use the same method for solving calls
+- implement finalize_challenge() for counter-actions
+- implement get_first_challenger() using async.wait()
+- make all counterable actions use the same method for solving challenges
 - break Player.counter_action() into the different actions.
 - unit-tests for every action / counter-action taken.
     - break do_action() so unit-tests can run on it
