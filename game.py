@@ -62,15 +62,15 @@ class Game:
 
     async def finalize_call(self, caller: Player, called: Player, action: Action):
 
-        logger.info(f"{caller} called {called} on action {action}")
-
         async def solve(card_name: str):
             if called.has(card_name):
+                logger.info(f"{called} has the card {card_name}!")
                 called.replace(card_name, self.deck)
                 await caller.lose_influence(self.discard_pile)
                 if (len(caller._cards) == 0):  # TODO, don't use caller._cards, find a better way
                     self.remove_player(caller)
             else:
+                logger.info(f"{called} does not have the card {card_name}!")
                 await called.lose_influence(self.discard_pile)
                 if (len(called._cards) == 0):  # TODO, don't use called._cards, find a better way
                     self.remove_player(called)
@@ -91,8 +91,6 @@ class Game:
             await solve("Captain")
 
         # TODO: implement solving from counter actions
-
-        logger.info("There were calls... skipping...")
 
     def remove_player(self, removed: Player):
         for idx, player in enumerate(self.players):
@@ -202,9 +200,10 @@ if __name__ == "__main__":
 
 """TODO:
 - block stealing - must state using what card
-- implement finalize_call()
+- implement finalize_call() for counter-actions
 - implement get_first_caller() using async.wait()
 - make all counterable actions use the same method for solving calls
 - break Player.counter_action() into the different actions.
-- break do_action() so unit-tests can run on it
+- unit-tests for every action / counter-action taken.
+    - break do_action() so unit-tests can run on it
 """
