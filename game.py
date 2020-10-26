@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import sys
@@ -7,10 +9,14 @@ from cards import CardList
 from deck import Deck
 from player import Player
 from random_player import RandomPlayer
-from utils import Action, CounterAction, IllegalActionError
+from action import Action, CounterAction, IllegalActionError, check_legal_action
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s | %(name)s | %(levelname)s | %(message)s')
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.DEBUG,
+    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+)
 
 
 class Game:
@@ -33,23 +39,25 @@ class Game:
 
     async def turn(self):
         for player in self.players:
-            while True:
+            action_is_illegal = True
+            while action_is_illegal:
                 action, target = await player.proactive_action(self.players)
                 try:
-                    self.check_legal_action(action, player, target)
+                    check_legal_action(action, player, target, self.deck)
                 except IllegalActionError as err:
-                    logger.info(err)
-                    logger.info(
-                        f"Player {player} played the illegal action {action}. Re-playing"
+                    logger.debug(err)
+                    logger.debug(
+                        f"Player {player} played the illegal action {action}. Re-playing."
                     )
-                    continue
-                finally:
-                    break
+                except StopIteration:
+                    action_is_illegal = False
 
             await self.do_action(player, action, target)
 
     # TODO this is hacky!
-    def get_first_caller(self, calls: Sequence[bool], callers: Sequence[Player]) -> Player:
+    def get_first_caller(
+        self, calls: Sequence[bool], callers: Sequence[Player]
+    ) -> Player:
         for idx, call in enumerate(calls):
             if call:
                 return callers[idx]
@@ -129,7 +137,9 @@ class Game:
 
                 else:
                     source.assassinate()
-                    if len(target.cards) == 0:
+                    if (
+                        len(target._cards) == 0
+                    ):  # TODO, don't use target._cards, find a better way
                         self.remove_player(target)
 
             elif action == Action.EXCHANGE:
@@ -151,20 +161,6 @@ class Game:
                 else:
                     source.steal()
 
-    def check_legal_action(self, action: Action, player: Player, target: Player):
-        if action == Action.COUP and player.coins < 7:
-            raise IllegalActionError("Can't execute Coup: not enough coins.")
-        elif action == Action.ASSASS and player.coins < 3:
-            raise IllegalActionError("Can't execute Assassination: not enough coins.")
-        elif action == Action.EXCHANGE and len(self.deck) < 2:
-            raise IllegalActionError("Can't execute Exchange: deck is empty.")
-        elif action == Action.STEAL and target.coins < 2:
-            raise IllegalActionError(f"Can't steal from {target}. Not enough coins.")
-        elif player.coins > 10 and Action != Action.COUP:
-            raise IllegalActionError(f"{player} Must perform COUP!")
-
-        # TODO add assertions that target is None if it should be.
-
 
 if __name__ == "__main__":
     players = [
@@ -181,4 +177,5 @@ if __name__ == "__main__":
 - implement finalize_call()
 - implement get_first_caller() using async
 - make all counterable actions use the same method for solving calls
+- break do_action() so unit-tests can run on it
 """

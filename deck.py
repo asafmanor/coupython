@@ -2,9 +2,16 @@ import logging
 import random
 
 from cards import Ambassador, Assassin, Captain, CardList, Contessa, Duke
-from utils import EmptyDeckError, IllegalActionError
 
 logger = logging.getLogger(__name__)
+
+
+class EmptyDeckError(Exception):
+    pass
+
+
+class CheatingError(Exception):
+    pass
 
 
 class Deck:
@@ -19,7 +26,7 @@ class Deck:
 
     @property
     def cards(self):
-        raise IllegalActionError("Can't look at the Deck's cards.")
+        raise CheatingError("Can't look at the Deck's cards.")
 
     @cards.setter
     def cards(self, cards):

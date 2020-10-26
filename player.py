@@ -2,7 +2,11 @@ import logging
 
 from cards import Card, CardList
 from deck import Deck
-from utils import Action, IllegalActionError, InsufficientFundsError
+from action import Action, IllegalActionError
+
+
+class InsufficientFundsError(Exception):
+    pass
 
 
 class Player:
@@ -52,7 +56,7 @@ class Player:
     def coup(self):
         self.coins -= 7
 
-    def assassinate(self, target):
+    def assassinate(self):
         self.coins -= 3
 
     def steal(self):
@@ -62,7 +66,7 @@ class Player:
         card_1 = deck.draw_card(shuffle=False)
         card_2 = deck.draw_card(shuffle=False)
         current_num_cards = len(self._cards)
-        return_cards = await self._finalize_exchange(self, CardList([card_1, card_2]))
+        return_cards = await self._finalize_exchange(CardList([card_1, card_2]))
 
         deck.return_cards(return_cards)
         deck.shuffle()
@@ -84,7 +88,7 @@ class Player:
 
     async def proactive_action(self, players) -> (Action, None):
         action, target = await self._proactive_action(players)
-        self.logger.info(f"Performed action {action} on player {target}")
+        self.logger.info(f"Attempts action {action} on player {target}")
 
         return action, target
 

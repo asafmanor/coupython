@@ -1,6 +1,6 @@
 {
-    "python.linting.pylintEnabled": true,
-    "python.linting.flake8Enabled": false,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
     "python.pythonPath": "/Users/asafmanor/miniconda3/envs/coreflow1.3.0_python3.7/bin/python"
 }

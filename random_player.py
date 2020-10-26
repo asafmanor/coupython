@@ -4,7 +4,7 @@ from typing import Sequence
 
 from cards import Card, CardList
 from player import Player
-from utils import Action, CounterAction
+from action import Action, CounterAction, check_legal_action
 
 
 def get_time_for_move():
@@ -56,7 +56,11 @@ def uniform_proactive_action(cards: CardList, players: Sequence[Player]) -> Acti
     ]
 
     action = random.choices(actions, weights=probs)[0]
-    target = random.choice(players) if action in [Action.COUP, Action.ASSASS, Action.STEAL] else None
+    target = (
+        random.choice(players)
+        if action in [Action.COUP, Action.ASSASS, Action.STEAL]
+        else None
+    )
 
     return action, target
 
@@ -128,4 +132,4 @@ class RandomPlayer(Player):
 
     async def _maybe_call(self, source, action: Action) -> bool:
         await asyncio.sleep(get_time_for_call())
-        return random.choices([True, False], [0.2, 0.8])[0]
+        return random.choices([True, False], [0.05, 0.95])[0]
