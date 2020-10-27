@@ -128,7 +128,7 @@ class Player:
     async def target_steal(self, source: Player) -> bool:
         """Called when you the player is the target of stealing."""
         counter_action = await self.counter_action(Action.STEAL, source)
-        if counter_action is None:
+        if counter_action is False:
             self.coins -= 2
 
         return counter_action

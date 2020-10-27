@@ -28,6 +28,7 @@ class Game:
         self.players = players
         self.deck = Deck()
         self.discard_pile = CardList()
+        self.n = 0
 
     async def __call__(self):
         logger.info("Game starting.")
@@ -38,17 +39,34 @@ class Game:
             player.cards = CardList([self.deck.draw_card(), self.deck.draw_card()])
 
         while True:
+            self.n += 1
             await self.turn()
+            print(str(game))
 
             # Finalize game
             if len(self.players) == 1:
                 logger.info(f"Player {self.players[0]} has won the game!")
                 return
 
+    def __str__(self):
+        out = "\n" + "=" * 70 + "\n"
+        out += "=" * 25 + f"   Turn number {self.n:2d}   " + "=" * 25 + "\n"
+        out += "=" * 70 + "\n"
+        for player in self.players:
+            out += f"{str(player):10} | {player.coins:02d} coins | {player._cards}\n"
+        out += "=" * 70 + "\n"
+        out += "=" * 70 + "\n" * 2
+
+        return out
+
+    def __repr__(self):
+        return str(self)
+
     async def turn(self):
         for player in self.players:
             # while True:
-            action, target = await player.proactive_action(self.players)
+            adversaries = [p for p in self.players if p != player]
+            action, target = await player.proactive_action(adversaries)
             try:
                 check_legal_action(action, player, target, self.deck)
             except StopIteration:
@@ -61,7 +79,7 @@ class Game:
             if call:
                 return challengers[idx]
 
-    async def finalize_challenge(self, challenger: Player, challenged: Player, action: Action):
+    async def solve_challenge(self, challenger: Player, challenged: Player, action: Action):
 
         async def solve(card_name: str):
             if challenged.has(card_name):
@@ -107,7 +125,7 @@ class Game:
         )
         if any(challenges):
             challenger = self.get_first_challenger(challenges, adversaries)
-            await self.finalize_challenge(challenger=challenger, challenged=source, action=action)
+            await self.solve_challenge(challenger=challenger, challenged=source, action=action)
 
         else:
             if action == Action.INCOME:
@@ -126,7 +144,7 @@ class Game:
                         claimed_duke, CounterAction.BLOCKFOREIGNAID
                     )
                     if counter_challenge:
-                        await self.finalize_challenge(
+                        await self.solve_challenge(
                             challenger=source,
                             challenged=claimed_duke,
                             action=CounterAction.BLOCKFOREIGNAID,
@@ -152,7 +170,7 @@ class Game:
                         target, CounterAction.BLOCKASSASS
                     )
                     if counter_challenge:
-                        await self.finalize_challenge(
+                        await self.solve_challenge(
                             challenger=source,
                             challenged=target,
                             action=CounterAction.BLOCKASSASS,
@@ -175,7 +193,7 @@ class Game:
                         target, CounterAction.BLOCKSTEAL
                     )
                     if counter_challenge:
-                        await self.finalize_challenge(
+                        await self.solve_challenge(
                             challenger=source,
                             challenged=target,
                             action=CounterAction.BLOCKSTEAL,
@@ -197,7 +215,7 @@ if __name__ == "__main__":
 
 """TODO:
 - block stealing - must state using what card
-- implement finalize_challenge() for counter-actions
+- implement solve_challenge() for counter-actions
 - implement get_first_challenger() using async.wait()
 - make all counterable actions use the same method for solving challenges
 - break Player.counter_action() into the different actions.

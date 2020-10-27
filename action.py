@@ -27,6 +27,12 @@ class CounterAction(enum.Enum):
     BLOCKSTEAL = 1
     BLOCKASSASS = 2
 
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
+
 
 def check_legal_action(
     action: Action, player, target, deck: Deck = None
