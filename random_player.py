@@ -18,38 +18,38 @@ def get_time_for_challange():
 def uniform_counter_action(
     cards: CardList, action: Action, source: Player
 ) -> CounterAction:
-    prob_BLOCKFOREIGNAID = 1
-    prob_BLOCKSTEAL = 1
-    prob_BLOCKASSASS = 1
+    prob_BLOCK_FOREIGNAID = 1
+    prob_BLOCK_STEAL = 1
+    prob_BLOCK_ASSASS = 1
 
     if action == Action.FOREIGNAID:
         if cards.has("Duke"):
-            prob_BLOCKFOREIGNAID = 0.6
+            prob_BLOCK_FOREIGNAID = 0.6
         else:
-            prob_BLOCKFOREIGNAID = 0.2
+            prob_BLOCK_FOREIGNAID = 0.2
 
-        actions = [CounterAction.BLOCKFOREIGNAID, None]
-        probs = [prob_BLOCKFOREIGNAID, 1 - prob_BLOCKFOREIGNAID]
+        actions = [CounterAction.BLOCK_FOREIGNAID, None]
+        probs = [prob_BLOCK_FOREIGNAID, 1 - prob_BLOCK_FOREIGNAID]
 
     if action == Action.STEAL:
         if cards.has("Captain") or cards.has("Ambassador"):
-            prob_BLOCKSTEAL = 0.9
+            prob_BLOCK_STEAL = 0.9
         else:
-            prob_BLOCKSTEAL = 0.3
+            prob_BLOCK_STEAL = 0.3
 
-        actions = [CounterAction.BLOCKSTEAL, None]
-        probs = [prob_BLOCKSTEAL, 1 - prob_BLOCKSTEAL]
+        actions = [CounterAction.BLOCK_STEAL, None]
+        probs = [prob_BLOCK_STEAL, 1 - prob_BLOCK_STEAL]
 
     if action == Action.ASSASS:
         if cards.has("Contessa") and len(cards) == 1:
-            prob_BLOCKASSASS = 1.0
+            prob_BLOCK_ASSASS = 1.0
         elif cards.has("Contessa") and len(cards) == 2:
-            prob_BLOCKASSASS = 0.9
+            prob_BLOCK_ASSASS = 0.9
         else:
-            prob_BLOCKASSASS = 0.3
+            prob_BLOCK_ASSASS = 0.3
 
-        actions = [CounterAction.BLOCKASSASS, None]
-        probs = [prob_BLOCKASSASS, 1 - prob_BLOCKASSASS]
+        actions = [CounterAction.BLOCK_ASSASS, None]
+        probs = [prob_BLOCK_ASSASS, 1 - prob_BLOCK_ASSASS]
 
     return random.choices(actions, weights=probs)[0]
 

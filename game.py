@@ -141,13 +141,13 @@ class Game:
                 if any(counter_actions):
                     claimed_duke = self.get_first_challenger(counter_actions, adversaries)
                     counter_challenge = await source.maybe_challenge(
-                        claimed_duke, CounterAction.BLOCKFOREIGNAID
+                        claimed_duke, CounterAction.BLOCK_FOREIGNAID
                     )
                     if counter_challenge:
                         await self.solve_challenge(
                             challenger=source,
                             challenged=claimed_duke,
-                            action=CounterAction.BLOCKFOREIGNAID,
+                            action=CounterAction.BLOCK_FOREIGNAID,
                         )
 
                 else:
@@ -167,13 +167,13 @@ class Game:
                 ca = await target.target_assassinate(source, self.discard_pile)
                 if ca:
                     counter_challenge = await source.maybe_challenge(
-                        target, CounterAction.BLOCKASSASS
+                        target, CounterAction.BLOCK_ASSASS
                     )
                     if counter_challenge:
                         await self.solve_challenge(
                             challenger=source,
                             challenged=target,
-                            action=CounterAction.BLOCKASSASS,
+                            action=CounterAction.BLOCK_ASSASS,
                         )
 
                 else:
@@ -190,13 +190,13 @@ class Game:
                 ca = await target.target_steal(source)
                 if ca:
                     counter_challenge = await source.maybe_challenge(
-                        target, CounterAction.BLOCKSTEAL
+                        target, CounterAction.BLOCK_STEAL
                     )
                     if counter_challenge:
                         await self.solve_challenge(
                             challenger=source,
                             challenged=target,
-                            action=CounterAction.BLOCKSTEAL,
+                            action=CounterAction.BLOCK_STEAL,
                         )
 
                 else:
