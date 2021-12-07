@@ -34,9 +34,7 @@ class CounterAction(enum.Enum):
         return self.name
 
 
-def check_legal_action(
-    action: Action, player, target, deck: Deck = None
-):
+def check_legal_action(action: Action, player, target, deck: Deck = None):
     """If action is illegal, IllegalActionError is raised. Otherwise, StopIteration is raised."""
 
     if action == Action.COUP and player.coins < 7:

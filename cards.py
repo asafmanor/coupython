@@ -12,6 +12,8 @@ class Card:
 
 
 class CardList(list):
+    # TODO implement with O(1) access by overloading some list methods
+    # For example, every time an item is added to the list, it's name can be added
     def has(self, name: str):
         for x in self:
             if x.name == name:

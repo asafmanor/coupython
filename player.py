@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from typing import Sequence, Tuple
 
 from action import Action
 from cards import Card, CardList
@@ -76,11 +76,11 @@ class Player:
         deck.shuffle()
         self._cards.append(deck.draw_card())
 
-    async def exchange(self, deck: Deck):
+    def exchange(self, deck: Deck):
         card_1 = deck.draw_card()
         card_2 = deck.draw_card()
         current_num_cards = len(self._cards)
-        return_cards = await self._exchange(CardList([card_1, card_2]))
+        return_cards = self._exchange(CardList([card_1, card_2]))
 
         deck.return_cards(return_cards)
         deck.shuffle()
@@ -91,17 +91,17 @@ class Player:
                 + f"is inequivalent to {current_num_cards}"
             )
 
-    async def maybe_challenge(self, source, action: Action) -> bool:
+    def do_challenge(self, source, action: Action) -> bool:
         if action in [Action.INCOME, Action.FOREIGNAID, Action.COUP]:
             return False
 
-        challange = await self._maybe_challenge(source, action)
+        challange = self._do_challenge(source, action)
         if challange:
             self.logger.info(f"Challanged action {action} of player {source}")
         return challange
 
-    async def proactive_action(self, players: Sequence[Player]) -> (Action, None):
-        action, target = await self._proactive_action(players)
+    def do_action(self, players: Sequence[Player]) -> Tuple[Action, None]:
+        action, target = self._do_action(players)
         if target is not None:
             self.logger.info(f"Attempts action {action} on player {target}")
         else:
@@ -109,52 +109,52 @@ class Player:
 
         return action, target
 
-    async def counter_action(self, action: Action, source: Player) -> bool:
-        counter_action = await self._counter_action(action, source)
+    def do_counter_action(self, action: Action, source: Player) -> bool:
+        counter_action = self._do_counter_action(action, source)
         if counter_action is not None:
             self.logger.info(f"Performed counter-action {counter_action}")
             return True
 
         return False
 
-    async def target_assassinate(self, source: Player, discard_pile: CardList) -> bool:
+    def target_assassinate(self, source: Player, discard_pile: CardList) -> bool:
         """Called when you the player is the target of an assassination."""
-        counter_action = await self.counter_action(Action.ASSASS, source)
+        counter_action = self.do_counter_action(Action.ASSASS, source)
         if not counter_action:
-            await self.lose_influence(discard_pile)
+            self.lose_influence(discard_pile)
 
         return counter_action
 
-    async def target_steal(self, source: Player) -> bool:
+    def target_steal(self, source: Player) -> bool:
         """Called when you the player is the target of stealing."""
-        counter_action = await self.counter_action(Action.STEAL, source)
+        counter_action = self.do_counter_action(Action.STEAL, source)
         if counter_action is False:
             self.coins -= 2
 
         return counter_action
 
-    async def target_coup(self, discard_pile: CardList):
-        return await self.lose_influence(discard_pile)
+    def target_coup(self, discard_pile: CardList):
+        return self.lose_influence(discard_pile)
 
-    async def lose_influence(self, discard_pile: CardList) -> int:
-        card = await self._lose_influence()
+    def lose_influence(self, discard_pile: CardList) -> int:
+        card = self._lose_influence()
         self.logger.info(f"Lost a {card.name} influence")
         discard_pile.append(card)
         return len(self._cards)
 
-    async def _lose_influence(self) -> Card:
+    def _lose_influence(self) -> Card:
         raise NotImplementedError
 
-    async def _exchange(self, extra_cards: CardList) -> CardList:
+    def _exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
-    async def _counter_action(self, action: Action, source: Player) -> Action:
+    def _do_counter_action(self, action: Action, source: Player) -> Action:
         raise NotImplementedError
 
-    async def _proactive_action(
+    def _do_action(
         self, players: Sequence[Player]
-    ) -> (Action, None):  # Actually, returns a different player
+    ) -> Tuple[Action, None]:  # Actually, returns a different player
         raise NotImplementedError
 
-    async def _maybe_challenge(self, source: Player, action: Action) -> bool:
+    def _do_challenge(self, source: Player, action: Action) -> bool:
         raise NotImplementedError
