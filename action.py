@@ -35,7 +35,7 @@ class CounterAction(enum.Enum):
 
 
 def check_legal_action(action: Action, player, target, deck: Deck = None):
-    """If action is illegal, IllegalActionError is raised. Otherwise, StopIteration is raised."""
+    """If action is illegal, IllegalActionError is raised."""
 
     if action == Action.COUP and player.coins < 7:
         raise IllegalActionError("Can't execute Coup: not enough coins.")
@@ -48,7 +48,3 @@ def check_legal_action(action: Action, player, target, deck: Deck = None):
 
     if action == Action.EXCHANGE and deck is not None and len(deck) < 2:
         raise IllegalActionError("Can't execute Exchange: deck is empty.")
-
-    # TODO add assertions that target is None if it should be.
-
-    raise StopIteration

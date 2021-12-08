@@ -12,6 +12,7 @@ class InsufficientFundsError(Exception):
     pass
 
 
+# TODO: add a belief state per player for the distribution of cards across the game
 class Player:
     # methods beginning with target_ are called when you are the target of an action
     # Gaming logic should only be implemented in subclasses of Player
@@ -36,6 +37,10 @@ class Player:
     @cards.setter
     def cards(self, cards: CardList):
         self._cards = cards
+
+    @property
+    def num_cards(self):
+        return len(self._cards)
 
     @property
     def coins(self) -> int:
@@ -73,7 +78,7 @@ class Player:
 
     def replace(self, card_name: str, deck: Deck):
         deck.return_cards(CardList([self.get(card_name)]))
-        deck.shuffle()
+        deck._shuffle()
         self._cards.append(deck.draw_card())
 
     def exchange(self, deck: Deck):
@@ -83,7 +88,7 @@ class Player:
         return_cards = self._exchange(CardList([card_1, card_2]))
 
         deck.return_cards(return_cards)
-        deck.shuffle()
+        deck._shuffle()
 
         if current_num_cards != len(self._cards):
             raise RuntimeError(
@@ -100,7 +105,7 @@ class Player:
             self.logger.info(f"Challanged action {action} of player {source}")
         return challange
 
-    def do_action(self, players: Sequence[Player]) -> Tuple[Action, None]:
+    def do_action(self, players: Sequence[Player]) -> Tuple[Action, None]:  # TODO change to state. this is PI.
         action, target = self._do_action(players)
         if target is not None:
             self.logger.info(f"Attempts action {action} on player {target}")

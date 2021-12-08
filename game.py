@@ -10,7 +10,6 @@ from action import Action, CounterAction, check_legal_action
 from cards import CardList
 from deck import Deck
 from player import Player
-from random_player import RandomPlayer
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -30,10 +29,19 @@ class Game:
         self.discard_pile = CardList()
         self.n = 0
 
+    @property
+    def state(self):
+        # TODO: need to be a state per player.
+        # + Add belief state
+        # + Add "mode" vector: enum of `active`, `challanger` (all players except active one), `target`, `counter-target`
+        return {
+            "player_stats": [(player.num_cards, player.coins) for player in self.players],  # TODO: change to matrix (P * [N, C])
+            "discard_pile": self.discard_pile,  # TODO: change to mask (discarded / non-discarded)
+            "turn": self.n
+        }
+
     def __call__(self):
         logger.info("Game starting.")
-        self.deck.shuffle()
-
         for player in self.players:
             player.coins = 2
             player.cards = CardList([self.deck.draw_card(), self.deck.draw_card()])
@@ -64,17 +72,19 @@ class Game:
 
     def turn(self):
         for player in self.players:
-            # while True:
-            adversaries = [p for p in self.players if p != player]
-            action, target = player.do_action(adversaries)
-            try:
-                check_legal_action(action, player, target, self.deck)
-            except StopIteration:
-                self.do_action(player, action, target)
+            # TODO: must be a better way to exclude from a list
+            # adversaries = [p for p in self.players if p != player]
+            action, target = player.do_action(self.state)  # when a player performs an action, he should recieve the state
+            check_legal_action(action, player, target, self.deck)  # TODO: legality of action should be asserted by the player?
+            self.do_action(player, action, target)
+            # try:
+            # except StopIteration:
 
     def get_first_challenger(
         self, challenges: Sequence[bool], challengers: Sequence[Player]
     ) -> Player:
+        # TODO: now that there is no use of async wait,
+        # there is no randomness in finding the first challenger
         for idx, call in enumerate(challenges):
             if call:
                 return challengers[idx]
@@ -122,17 +132,17 @@ class Game:
                 logger.debug(f"List of players: {self.players}")
 
     def do_action(self, source: Player, action: Action, target: Player):
-        adversaries = [player for player in self.players if player != source]
-        challenges = [player.do_challenge(source, action) for player in adversaries]
+        adversaries = [player for player in self.players if player != source]  # TODO: must be a better way to exclude
+        challenges = [player.do_challenge(source, action) for player in adversaries]  # TODO: do_challange needs state as input
         if any(challenges):
-            challenger = self.get_first_challenger(challenges, adversaries)
+            challenger = self.get_first_challenger(challenges, adversaries)  # TODO: change to: shuffle(adverseries) and take the first.
             self.solve_challenge(
                 challenger=challenger, challenged=source, action=action
             )
 
         else:
             if action == Action.INCOME:
-                source.income()
+                source.income()  # TODO: return reward
 
             elif action == Action.FOREIGNAID:
                 counter_actions = [

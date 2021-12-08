@@ -23,6 +23,7 @@ class Deck:
         cards += [Captain(i) for i in range(3)]
         cards += [Contessa(i) for i in range(3)]
         self.cards = CardList(cards)
+        self._shuffle()
 
     @property
     def cards(self):
@@ -32,7 +33,7 @@ class Deck:
     def cards(self, cards):
         self._cards = cards
 
-    def shuffle(self):
+    def _shuffle(self):
         random.shuffle(self._cards)
 
     def draw_card(self):
@@ -43,6 +44,7 @@ class Deck:
     def return_cards(self, cards: CardList):
         self._cards += cards
         assert isinstance(self._cards, CardList)
+        self._shuffle()
 
     def __len__(self):
         return len(self._cards)
