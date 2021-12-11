@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Sequence, Tuple
 
+import numpy as np
+
 from action import Action
 from cards import Card, CardList
 from deck import Deck, CheatingError
@@ -163,3 +165,95 @@ class Player:
 
     def _do_challenge(self, source: Player, action: Action) -> bool:
         raise NotImplementedError
+
+
+import torch
+import torch.nn.functional as F
+
+from board import Board
+from card import CARDS
+from cards import DiscardPile
+from typing import List
+
+
+class BasePlayer:
+
+    def __init__(self, indx: int, name: str, board: Board, discarded: DiscardPile):
+        self._indx = indx
+        self._name = name
+        self._board = board
+        self._discarded = discarded
+
+        self._cards: List[Card] = []
+        self._coins: int = 0
+        self._logger = logging.getLogger(name)
+
+        self._beliefs = torch.rand(board.num_players, len(CARDS.keys()), requires_grad=True)
+        self._beliefs = F.softmax(self._beliefs, dim=0)
+
+    def __str__(self):
+        return f"{self._name} (player #{self._indx})."
+
+    def __repr__(self):
+        return f"{str(self)} [cards={len(self._cards)} ; coins={self._coins}]"
+
+    @property
+    def board(self) -> torch.Tensor:
+        return self._board.view(self._indx)
+
+    @property
+    def state(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return (self.board, self._discarded.cards, self._beliefs)
+
+    @property
+    def cards(self) -> List[Card]:
+        return self._cards
+
+    @cards.setter
+    def cards(self, x):
+        raise PermissionError
+
+    @property
+    def coins(self) -> int:
+        return self._coins
+
+    @coins.setter
+    def coins(self, x):
+        raise PermissionError
+
+    def add_card(self, card: Card):
+        self._cards.append(card)
+        self._board.add_player_cards(self._indx, 1)
+
+    def sub_card(self, card: Card):
+        self._cards.remove(card)
+        self._board.sub_player_cards(self._indx, 1)
+
+    def add_coins(self, num_coins: int):
+        self._coins = self._coins + num_coins
+        self._board.add_player_coins(self._indx, num_coins)
+
+    def sub_coins(self, num_coins: int):
+        self._coins = self._coins - num_coins
+        self._board.sub_player_coins(self._indx, num_coins)
+
+    def has(self, card: Card) -> bool:
+        return type(card) in self._cards
+
+    def income(self):
+        self.add_coins(1)
+
+    def foreign_aid(self):
+        self.add_coins(2)
+
+    def tax(self):
+        self.add_coins(3)
+
+    def coup(self):
+        self.sub_coins(7)
+
+    def assassinate(self):
+        self.sub_coins(3)
+
+    def steal(self):
+        self.add_coins(2)
