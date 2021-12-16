@@ -42,3 +42,4 @@ CARDS = {
     name: obj for name, obj in inspect.getmembers(sys.modules[__name__], inspect.isclass)
     if obj.__module__ is __name__ and name != 'Card'
 }
+CARDS_TO_IDS = {x: i for i, x in enumerate(CARDS.values())}
