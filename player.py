@@ -6,9 +6,9 @@ from typing import Sequence, Tuple
 
 import numpy as np
 
-from action import Action
+# from action import Action
 from cards import Card
-from deck import Deck, CheatingError
+# from deck import Deck, CheatingError
 
 
 class InsufficientFundsError(Exception):
@@ -175,6 +175,7 @@ import torch.nn.functional as F
 from board import Board
 from card import CARDS, CARDS_TO_IDS
 from cards import DiscardPile, NUM_CARDS_PER_TYPE
+from contextlib import contextmanager
 
 
 class PlayerModesEnum(enum.Enum):
@@ -194,14 +195,18 @@ class PlayerModes:
         self._mode = torch.zeros(4, dtype=torch.uint8)
 
     def set(self, mode, val):
-        assert mode in PlayerModesEnum.list()
+        assert mode.value in PlayerModesEnum.list()
         assert val == 0 or val == 1
-        self._mode[mode] = val
+        self._mode[mode.value] = val
 
 
 class BasePlayer:
 
     def __init__(self, indx: int, name: str, board: Board, discarded: DiscardPile):
+
+        if not indx < board.num_players:
+            raise IndexError
+
         self._indx = indx
         self._name = name
         self._board = board
@@ -215,22 +220,12 @@ class BasePlayer:
         self._beliefs = F.softmax(self._beliefs, dim=0)
 
         self._player_mode = PlayerModes()
-        self._modes_stack = []
 
     def __str__(self):
         return f"{self._name} (player #{self._indx})."
 
     def __repr__(self):
         return f"{str(self)} [cards={len(self._cards)} ; coins={self._coins}]"
-
-    def __enter__(self, player_mode: PlayerModesEnum):
-        self._player_mode.set(mode=player_mode, val=1)
-        self._modes_stack.append(player_mode)
-
-    def __exit__(self):
-        player_mode = self._modes_stack[-1]
-        self._player_mode.set(mode=player_mode, val=0)
-        self._modes_stack = self._modes_stack[:-1]
 
     @property
     def board(self) -> torch.Tensor:
@@ -250,7 +245,7 @@ class BasePlayer:
 
     @property
     def state(self) -> Tuple:
-        return (self.board, self.discarded, self.cards, self.coins, self._beliefs, self._player_mode)
+        return (self.board, self.discarded, self.cards, self.coins, self._beliefs, self._player_mode._mode)
 
     def add_card(self, card: Card):
         card_idx = CARDS_TO_IDS[card]
@@ -293,3 +288,38 @@ class BasePlayer:
 
     def steal(self):
         self.add_coins(2)
+
+
+@contextmanager
+def act(player, player_mode):
+    """
+    Context manager for players taking actions.
+    :param player:
+    :param player_mode:
+    :return:
+    """
+    modes_stack = []
+    try:
+        player._player_mode.set(mode=player_mode, val=1)
+        modes_stack.append(player_mode)
+        yield
+    finally:
+        player._player_mode.set(mode=player_mode, val=0)
+        modes_stack = modes_stack[:-1]
+
+
+if __name__ == "__main__":
+    board = Board(2)
+    discarded = DiscardPile()
+    asaf = BasePlayer(indx=0, name="Asaf Manor", board=board, discarded=discarded)
+    hossein = BasePlayer(indx=1, name="Hossein Mousavi", board=board, discarded=discarded)
+    print(asaf._player_mode._mode)
+    with act(asaf, PlayerModesEnum.active):
+        print(asaf._player_mode._mode)
+        with act(asaf, PlayerModesEnum.challenged):
+            print(asaf._player_mode._mode)
+            with act(asaf, PlayerModesEnum.responding):
+                print(asaf._player_mode._mode)
+            print(asaf._player_mode._mode)
+        print(asaf._player_mode._mode)
+    print(asaf._player_mode._mode)
