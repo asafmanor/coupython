@@ -126,9 +126,9 @@ class Game:
                 raise RuntimeError(f"{challenged} tried to block stealing with {with_card}")
             solve(with_card)
         elif action == CounterAction.BLOCK_FOREIGNAID:
-            solve(("Duke"))
+            solve("Duke")
         elif action == CounterAction.BLOCK_ASSASSINATION:
-            solve(("Contessa"))
+            solve("Contessa")
         else:
             raise RuntimeError(f"How do we solve a challange to {action}??")
 
@@ -214,19 +214,19 @@ class Game:
 
 
 if __name__ == "__main__":
-    # while True:
-    all_players = [
-        RandomPlayer("Asaf"),
-        RandomPlayer("Nitai"),
-        RandomPlayer("Hossein"),
-        RandomPlayer("Dror"),
-        RandomPlayer("Matan"),
-        RandomPlayer("Brandon"),
-    ]
-    num_players = np.random.choice([3, 4, 5, 6])
-    players = [x for x in np.random.choice(all_players, num_players, replace=False)]
-    game = Game(players)
-    game()
+    while True:
+        all_players = [
+            RandomPlayer("Asaf"),
+            RandomPlayer("Nitai"),
+            RandomPlayer("Hossein"),
+            RandomPlayer("Dror"),
+            RandomPlayer("Matan"),
+            RandomPlayer("Brandon"),
+        ]
+        num_players = np.random.choice([3, 4, 5, 6])
+        players = [x for x in np.random.choice(all_players, num_players, replace=False)]
+        game = Game(players)
+        game()
 
 """
 - Counter actions - everybody can challange!
