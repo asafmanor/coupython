@@ -38,7 +38,7 @@ class RandomPlayer(Player):
         elif action == Action.STEAL:
             with_card = random.choice(["Captain", "Ambassador"])
 
-        return np.random.choice([True, False], 1, p=[0.5, 0.5]), with_card
+        return np.random.choice([True, False], 1, p=[0.5, 0.5]).item(), with_card
 
     def _do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, Player]:
         all_actions = [x for x in Action]
@@ -63,4 +63,4 @@ class RandomPlayer(Player):
         return action, target
 
     def _do_challenge(self, source: Player, action: Action, state: Dict) -> bool:
-        return np.random.choice([True, False], 1, p=[0.1, 0.9])
+        return np.random.choice([True, False], 1, p=[0.1, 0.9]).item()

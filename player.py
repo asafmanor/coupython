@@ -96,12 +96,16 @@ class Player:
             return False
 
         challange = self._do_challenge(source, action, state)
+        assert isinstance(challange, bool)
         if challange:
             self.logger.info(f"Challanged action {action} of player {source}")
         return challange
 
     def do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, None]:  # TODO change to state. this is PI.
         action, target = self._do_action(players, state)
+        assert isinstance(action, Action)
+        if target:
+            assert isinstance(target, Player)
         if target is not None:
             self.logger.info(f"Attempts action {action} on player {target}")
         else:
@@ -111,6 +115,10 @@ class Player:
 
     def do_counter_action(self, action: Action, source: Player) -> Tuple[bool, str]:
         counter_action, with_card = self._do_counter_action(action, source)
+        assert isinstance(counter_action, bool)
+        if with_card:
+            assert isinstance(with_card, str)
+
         if counter_action:
             counter_action_type = ACTION_TO_COUNTER_ACTION[action]
             self.logger.info(f"Performs counter-action {counter_action_type} with {with_card} on {source}")
@@ -129,7 +137,7 @@ class Player:
 
         return counter_action, with_card
 
-    def counter_steal(self, source: Player) -> Tuple[bool, str]:
+    def counter_steal(self, source: Player) -> bool:
         """Called when you the player is the target of stealing."""
         counter_action, with_card = self.do_counter_action(Action.STEAL, source)
         if counter_action is False:

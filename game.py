@@ -60,8 +60,8 @@ class Game:
             if len(self.players) == 1:
                 logger.info(f"Player {self.players[0]} has won the game!")
                 return
-            elif len(self.players) == 0:
-                raise RuntimeError("We have 0 players left...")
+            elif len(self.players) < 1:
+                raise RuntimeError(f"We have {len(self.players)} players left...")
 
     def __str__(self):
         out = "\n" + "=" * 70 + "\n"
@@ -214,7 +214,7 @@ class Game:
 
 
 if __name__ == "__main__":
-    while True:
+    for _ in range(50):
         all_players = [
             RandomPlayer("Asaf"),
             RandomPlayer("Nitai"),
