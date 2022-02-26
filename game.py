@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import io
 import logging
 import random
 import sys
 from typing import Dict, Sequence
 
+import numpy as np
+
 from action import Action, CounterAction, check_legal_action
 from cards import CardList
 from deck import Deck
 from player import Player
+from random_player import RandomPlayer
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -21,6 +23,7 @@ random.seed(0)
 
 class Game:
     def __init__(self, players: Sequence[Player]):
+
         logger.info(f"Game is set up with {players}")
         self.players = players
         self.deck = Deck()
@@ -46,6 +49,8 @@ class Game:
             player.coins = 2
             player.cards = CardList([self.deck.draw_card(), self.deck.draw_card()])
 
+        print(str(game))
+
         while True:
             self.n += 1
             self.turn()
@@ -55,6 +60,8 @@ class Game:
             if len(self.players) == 1:
                 logger.info(f"Player {self.players[0]} has won the game!")
                 return
+            elif len(self.players) == 0:
+                raise RuntimeError("We have 0 players left...")
 
     def __str__(self):
         out = "\n" + "=" * 70 + "\n"
@@ -71,12 +78,13 @@ class Game:
         return str(self)
 
     def turn(self):
-        for player in self.players:
-            action, target = player.do_action(self.state)
+        for active_player in self.players:
+            adversaries = [x for x in self.players if active_player != x]  # TODO: must be a better way to exclude
+            action, target = active_player.do_action(adversaries, self.state)
             check_legal_action(
-                action, player, target, self.deck
+                action, active_player, target, self.deck
             )  # TODO: legality of action should be asserted by the player?
-            self._turn(player, action, target)
+            self._turn(active_player, action, target)
 
     def get_first_challenger(self, challenges: Sequence[bool], challengers: Sequence[Player]) -> Player:
         ch_pl_tuples = [x for x in zip(challenges, challengers)]
@@ -85,7 +93,7 @@ class Game:
             if ch:
                 return pl
 
-    def solve_challenge(self, challenger: Player, challenged: Player, action: Action):
+    def solve_challenge(self, challenger: Player, challenged: Player, action: Action, with_card: str = None):
         def solve(card_name: str):
             if challenged.has(card_name):
                 logger.info(f"{challenged} has the card {card_name}!")
@@ -102,7 +110,6 @@ class Game:
         if action == Action.INCOME:
             raise RuntimeError("INCOME Action was challenged.")
         elif action == Action.FOREIGNAID:
-            # TODO why is that an error??
             raise RuntimeError("FOREIGNAID Action was challenged.")
         elif action == Action.COUP:
             raise RuntimeError("COUP Action was challenged.")
@@ -114,6 +121,14 @@ class Game:
             solve("Ambassador")
         elif action == Action.STEAL:
             solve("Captain")
+        elif action == CounterAction.BLOCK_STEAL:
+            if with_card not in ("Captain", "Ambassador"):
+                raise RuntimeError(f"{challenged} tried to block stealing with {with_card}")
+            solve(with_card)
+        elif action == CounterAction.BLOCK_FOREIGNAID:
+            solve(("Duke"))
+        elif action == CounterAction.BLOCK_ASSASSINATION:
+            solve(("Contessa"))
         else:
             raise RuntimeError(f"How do we solve a challange to {action}??")
 
@@ -124,89 +139,99 @@ class Game:
                 logger.info(f"Player {player} was removed from the game.")
                 logger.debug(f"List of players: {self.players}")
 
-    def _turn(self, source: Player, action: Action, target: Player):
-        adversaries = [player for player in self.players if player != source]  # TODO: must be a better way to exclude
-        challenges = [player.do_challenge(source, action, self.state) for player in adversaries]
+    def _turn(self, active_player: Player, action: Action, target: Player):
+        adversaries = [x for x in self.players if active_player != x]  # TODO: must be a better way to exclude
+        challenges = [adv.do_challenge(active_player, action, self.state) for adv in adversaries]
         if any(challenges):
             challenger = self.get_first_challenger(challenges, adversaries)
-            self.solve_challenge(challenger=challenger, challenged=source, action=action)
+            self.solve_challenge(challenger=challenger, challenged=active_player, action=action)
 
         else:
             if action == Action.INCOME:
-                source.income()  # TODO: return reward
+                active_player.income()  # TODO: return reward
 
             elif action == Action.FOREIGNAID:
-                counter_actions = [player.do_counter_action(Action.FOREIGNAID, source) for player in adversaries]
+                counter_actions = [player.counter_foreign_aid(active_player)[0] for player in adversaries]
                 if any(counter_actions):
+                    # TODO: this is an abuse of "get_first_challenger" as this is not a challange but a counter action
                     player_claiming_to_have_duke = self.get_first_challenger(counter_actions, adversaries)
-                    counter_challenge = source.do_challenge(
+                    counter_challenge = active_player.do_challenge(
                         player_claiming_to_have_duke, CounterAction.BLOCK_FOREIGNAID, self.state
                     )
                     if counter_challenge:
                         self.solve_challenge(
-                            challenger=source,
+                            challenger=active_player,
                             challenged=player_claiming_to_have_duke,
                             action=CounterAction.BLOCK_FOREIGNAID,
                         )
 
                 else:
-                    source.foreign_aid()
+                    active_player.foreign_aid()
 
             elif action == Action.COUP:
-                source.coup()
+                active_player.coup()
                 target.target_coup(self.discard_pile)
 
                 if target.num_cards == 0:
                     self.remove_player(target)
 
             elif action == Action.TAX:
-                source.tax()
+                active_player.tax()
 
             elif action == Action.ASSASSINATION:
-                ca = target.counter_assassinate(source, self.discard_pile)
+                ca, _ = target.counter_assassinate(active_player, self.discard_pile)
                 if ca:
-                    counter_challenge = source.do_challenge(target, CounterAction.BLOCK_ASSASSINATION, self.state)
+                    counter_challenge = active_player.do_challenge(
+                        target, CounterAction.BLOCK_ASSASSINATION, self.state
+                    )
                     if counter_challenge:
                         self.solve_challenge(
-                            challenger=source, challenged=target, action=CounterAction.BLOCK_ASSASSINATION,
+                            challenger=active_player, challenged=target, action=CounterAction.BLOCK_ASSASSINATION,
                         )
 
                 else:
-                    source.assassinate()
+                    active_player.assassinate()
                     if target.num_cards == 0:
                         self.remove_player(target)
 
             elif action == Action.EXCHANGE:
-                source.exchange(self.deck)
+                active_player.exchange(self.deck)
 
             elif action == Action.STEAL:
-                ca = target.counter_steal(source)
+                ca, with_card = target.counter_steal(active_player)
                 if ca:
-                    counter_challenge = source.do_challenge(target, CounterAction.BLOCK_STEAL, self.state)
+                    counter_challenge = active_player.do_challenge(target, CounterAction.BLOCK_STEAL, self.state)
                     if counter_challenge:
                         self.solve_challenge(
-                            challenger=source, challenged=target, action=CounterAction.BLOCK_STEAL,
+                            challenger=active_player,
+                            challenged=target,
+                            action=CounterAction.BLOCK_STEAL,
+                            with_card=with_card,
                         )
 
                 else:
-                    source.steal()
+                    active_player.steal()
 
 
 if __name__ == "__main__":
-    players = [
-        RandomPlayer("Acapella"),
-        RandomPlayer("Boogy"),
-        RandomPlayer("Classic"),
-        RandomPlayer("Disco"),
+    # while True:
+    all_players = [
+        RandomPlayer("Asaf"),
+        RandomPlayer("Nitai"),
+        RandomPlayer("Hossein"),
+        RandomPlayer("Dror"),
+        RandomPlayer("Matan"),
+        RandomPlayer("Brandon"),
     ]
+    num_players = np.random.choice([3, 4, 5, 6])
+    players = [x for x in np.random.choice(all_players, num_players, replace=False)]
     game = Game(players)
     game()
 
-"""TODO:
-- block stealing - must state using what card
-- implement solve_challenge() for counter-actions
-- make all counterable actions use the same method for solving challenges
-- break Player.counter_action() into the different actions.
-- unit-tests for every action / counter-action taken.
-    - break do_action() so unit-tests can run on it
+"""
+- Counter actions - everybody can challange!
+- All counterable actions should use the same method for the rundown.
+- Unit tests after each turn:
+    - Total number of cards in the game.
+    - Total number of coins in the game.
 """

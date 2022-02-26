@@ -1,6 +1,9 @@
 import enum
 from deck import Deck
-from player import Player
+
+
+class _Player:
+    pass
 
 
 class IllegalActionError(Exception):
@@ -35,14 +38,26 @@ class CounterAction(enum.Enum):
         return self.name
 
 
-def check_legal_action(action: Action, player: Player, target: Player, deck: Deck = None):
+ACTION_TO_COUNTER_ACTION = {
+    Action.FOREIGNAID: CounterAction.BLOCK_FOREIGNAID,
+    Action.STEAL: CounterAction.BLOCK_STEAL,
+    Action.ASSASSINATION: CounterAction.BLOCK_ASSASSINATION,
+}
+
+
+def requires_target(action: Action):
+    return action in [Action.COUP, Action.ASSASSINATION, Action.STEAL]
+
+
+def check_legal_action(action: Action, player: _Player, target: _Player, deck: Deck = None):
     """If action is illegal, IllegalActionError is raised."""
 
-    if action in [Action.COUP, Action.ASSASSINATION, Action.STEAL] and target is None:
-        raise IllegalActionError(f"Can't perform action {action} with no target.")
-
-    if action in [Action.INCOME, Action.FOREIGNAID, Action.TAX, Action.EXCHANGE] and target is not None:
-        raise IllegalActionError(f"Can't perform action {action} with a target.")
+    if requires_target(action):
+        if target is None:
+            raise IllegalActionError(f"Can't perform action {action} with no target.")
+    else:
+        if target is not None:
+            raise IllegalActionError(f"Can't perform action {action} with a target.")
 
     if action == Action.COUP and player.coins < 7:
         raise IllegalActionError("Can't execute Coup: not enough coins.")
