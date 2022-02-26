@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 from action import Action
 from cards import Card, CardList
@@ -14,11 +14,9 @@ class InsufficientFundsError(Exception):
 
 # TODO: add a belief state per player for the distribution of cards across the game
 class Player:
-    # methods beginning with target_ are called when you are the target of an action
-    # Gaming logic should only be implemented in subclasses of Player
     def __init__(self, name: str):
         self.name = name
-        self.cards: CardList = None
+        self._cards: CardList = None
         self.logger = logging.getLogger(name)
 
     def __str__(self):
@@ -29,9 +27,6 @@ class Player:
 
     @property
     def cards(self):
-        self.logger.debug(
-            "Cards can't be accessed. If the cards must be accessed, use `self._cards`"
-        )
         raise CheatingError("Can't look at a player's cards.")
 
     @cards.setter
@@ -96,11 +91,11 @@ class Player:
                 + f"is inequivalent to {current_num_cards}"
             )
 
-    def do_challenge(self, source, action: Action) -> bool:
+    def do_challenge(self, source, action: Action, state: Dict) -> bool:
         if action in [Action.INCOME, Action.FOREIGNAID, Action.COUP]:
             return False
 
-        challange = self._do_challenge(source, action)
+        challange = self._do_challenge(source, action, state)
         if challange:
             self.logger.info(f"Challanged action {action} of player {source}")
         return challange
@@ -122,15 +117,15 @@ class Player:
 
         return False
 
-    def target_assassinate(self, source: Player, discard_pile: CardList) -> bool:
+    def counter_assassinate(self, source: Player, discard_pile: CardList) -> bool:
         """Called when you the player is the target of an assassination."""
-        counter_action = self.do_counter_action(Action.ASSASS, source)
+        counter_action = self.do_counter_action(Action.ASSASSINATION, source)
         if not counter_action:
             self.lose_influence(discard_pile)
 
         return counter_action
 
-    def target_steal(self, source: Player) -> bool:
+    def counter_steal(self, source: Player) -> bool:
         """Called when you the player is the target of stealing."""
         counter_action = self.do_counter_action(Action.STEAL, source)
         if counter_action is False:
@@ -161,5 +156,5 @@ class Player:
     ) -> Tuple[Action, None]:  # Actually, returns a different player
         raise NotImplementedError
 
-    def _do_challenge(self, source: Player, action: Action) -> bool:
+    def _do_challenge(self, source: Player, action: Action, state: Dict) -> bool:
         raise NotImplementedError

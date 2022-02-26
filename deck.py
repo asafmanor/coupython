@@ -22,7 +22,7 @@ class Deck:
         cards += [Ambassador(i) for i in range(3)]
         cards += [Captain(i) for i in range(3)]
         cards += [Contessa(i) for i in range(3)]
-        self.cards = CardList(cards)
+        self._cards = CardList(cards)
         self._shuffle()
 
     @property
