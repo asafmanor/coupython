@@ -63,4 +63,4 @@ class RandomPlayer(Player):
         return action, target
 
     def _do_challenge(self, source: Player, action: Action, state: Dict) -> bool:
-        return np.random.choice([True, False], 1, p=[0.5, 0.5])
+        return np.random.choice([True, False], 1, p=[0.1, 0.9])

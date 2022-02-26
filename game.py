@@ -230,7 +230,6 @@ if __name__ == "__main__":
 
 """
 - Counter actions - everybody can challange!
-- All counterable actions should use the same method for the rundown.
 - Unit tests after each turn:
     - Total number of cards in the game.
     - Total number of coins in the game.
