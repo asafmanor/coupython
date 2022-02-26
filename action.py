@@ -27,9 +27,9 @@ class Action(enum.Enum):
 
 
 class CounterAction(enum.Enum):
-    BLOCK_FOREIGNAID = 0
-    BLOCK_STEAL = 1
-    BLOCK_ASSASSINATION = 2
+    BLOCK_FOREIGNAID = 7
+    BLOCK_STEAL = 8
+    BLOCK_ASSASSINATION = 9
 
     def __repr__(self):
         return self.name

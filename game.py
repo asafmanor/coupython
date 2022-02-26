@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import enum
 import logging
 import random
 import sys
+from collections import defaultdict
 from typing import Dict, Sequence
-
-import numpy as np
 
 from action import Action, CounterAction, check_legal_action
 from cards import CardList
@@ -19,6 +19,13 @@ logging.basicConfig(
 )
 
 random.seed(0)
+
+
+class PlayerMode(enum.Enum):
+    ACTIVE = 0
+    TARGET = 1
+    COUNTER_TARGET = 2
+    CHALLENGER = 3
 
 
 class Game:
@@ -43,7 +50,7 @@ class Game:
             "turn": self.n,
         }
 
-    def __call__(self):
+    def __call__(self) -> Player:
         logger.info("Game starting.")
         for player in self.players:
             player.coins = 2
@@ -59,7 +66,7 @@ class Game:
             # Finalize game
             if len(self.players) == 1:
                 logger.info(f"Player {self.players[0]} has won the game!")
-                return
+                return self.players[0]
             elif len(self.players) < 1:
                 raise RuntimeError(f"We have {len(self.players)} players left...")
 
@@ -86,7 +93,7 @@ class Game:
             )  # TODO: legality of action should be asserted by the player?
             self._turn(active_player, action, target)
 
-    def get_first_challenger(self, challenges: Sequence[bool], challengers: Sequence[Player]) -> Player:
+    def _get_single_random(self, challenges: Sequence[bool], challengers: Sequence[Player]) -> Player:
         ch_pl_tuples = [x for x in zip(challenges, challengers)]
         random.shuffle(ch_pl_tuples)
         for ch, pl in ch_pl_tuples:
@@ -143,7 +150,7 @@ class Game:
         adversaries = [x for x in self.players if active_player != x]  # TODO: must be a better way to exclude
         challenges = [adv.do_challenge(active_player, action, self.state) for adv in adversaries]
         if any(challenges):
-            challenger = self.get_first_challenger(challenges, adversaries)
+            challenger = self._get_single_random(challenges, adversaries)
             self.solve_challenge(challenger=challenger, challenged=active_player, action=action)
 
         else:
@@ -151,12 +158,13 @@ class Game:
                 active_player.income()  # TODO: return reward
 
             elif action == Action.FOREIGNAID:
-                counter_actions = [player.counter_foreign_aid(active_player)[0] for player in adversaries]
+                counter_actions = [adv.counter_foreign_aid(active_player, self.state)[0] for adv in adversaries]
                 if any(counter_actions):
-                    # TODO: this is an abuse of "get_first_challenger" as this is not a challange but a counter action
-                    player_claiming_to_have_duke = self.get_first_challenger(counter_actions, adversaries)
+                    player_claiming_to_have_duke = self._get_single_random(counter_actions, adversaries)
                     counter_challenge = active_player.do_challenge(
-                        player_claiming_to_have_duke, CounterAction.BLOCK_FOREIGNAID, self.state
+                        player_claiming_to_have_duke,
+                        CounterAction.BLOCK_FOREIGNAID,
+                        self.state,
                     )
                     if counter_challenge:
                         self.solve_challenge(
@@ -170,7 +178,7 @@ class Game:
 
             elif action == Action.COUP:
                 active_player.coup()
-                target.target_coup(self.discard_pile)
+                target.counter_coup(self.discard_pile)
 
                 if target.num_cards == 0:
                     self.remove_player(target)
@@ -179,7 +187,7 @@ class Game:
                 active_player.tax()
 
             elif action == Action.ASSASSINATION:
-                ca, _ = target.counter_assassinate(active_player, self.discard_pile)
+                ca, _ = target.counter_assassinate(active_player, self.discard_pile, self.state)
                 if ca:
                     counter_challenge = active_player.do_challenge(
                         target, CounterAction.BLOCK_ASSASSINATION, self.state
@@ -198,7 +206,7 @@ class Game:
                 active_player.exchange(self.deck)
 
             elif action == Action.STEAL:
-                ca, with_card = target.counter_steal(active_player)
+                ca, with_card = target.counter_steal(active_player, self.state)
                 if ca:
                     counter_challenge = active_player.do_challenge(target, CounterAction.BLOCK_STEAL, self.state)
                     if counter_challenge:
@@ -214,6 +222,7 @@ class Game:
 
 
 if __name__ == "__main__":
+    winners = defaultdict(int)
     for _ in range(50):
         all_players = [
             RandomPlayer("Asaf"),
@@ -223,10 +232,12 @@ if __name__ == "__main__":
             RandomPlayer("Matan"),
             RandomPlayer("Brandon"),
         ]
-        num_players = np.random.choice([3, 4, 5, 6])
-        players = [x for x in np.random.choice(all_players, num_players, replace=False)]
+        players = all_players
         game = Game(players)
-        game()
+        winner = game()
+        winners[winner.name] += 1
+
+    print(winners)
 
 """
 - Counter actions - everybody can challange!

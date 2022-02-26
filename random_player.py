@@ -30,7 +30,7 @@ class RandomPlayer(Player):
         self.logger.debug(f"Has {self._cards} now.")
         return CardList([card0, card1])
 
-    def _do_counter_action(self, action: Action, source: Player) -> Tuple[bool, str]:
+    def _do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
         if action == Action.FOREIGNAID:
             with_card = "Duke"
         elif action == Action.ASSASSINATION:

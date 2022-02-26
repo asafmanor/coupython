@@ -113,8 +113,8 @@ class Player:
 
         return action, target
 
-    def do_counter_action(self, action: Action, source: Player) -> Tuple[bool, str]:
-        counter_action, with_card = self._do_counter_action(action, source)
+    def do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
+        counter_action, with_card = self._do_counter_action(action, source, state)
         assert isinstance(counter_action, bool)
         if with_card:
             assert isinstance(with_card, str)
@@ -126,34 +126,33 @@ class Player:
             self.logger.info(f"Does not counter {action} by {source}")
         return counter_action, with_card
 
-    def counter_foreign_aid(self, source: Player) -> Tuple[bool, str]:
-        return self.do_counter_action(Action.FOREIGNAID, source)
+    def counter_foreign_aid(self, source: Player, state: Dict) -> Tuple[bool, str]:
+        return self.do_counter_action(Action.FOREIGNAID, source, state)
 
-    def counter_assassinate(self, source: Player, discard_pile: CardList) -> Tuple[bool, str]:
+    def counter_assassinate(self, source: Player, discard_pile: CardList, state: Dict) -> Tuple[bool, str]:
         """Called when you the player is the target of an assassination."""
-        counter_action, with_card = self.do_counter_action(Action.ASSASSINATION, source)
+        counter_action, with_card = self.do_counter_action(Action.ASSASSINATION, source, state)
         if not counter_action:
             self.lose_influence(discard_pile)
 
         return counter_action, with_card
 
-    def counter_steal(self, source: Player) -> bool:
+    def counter_steal(self, source: Player, state: Dict) -> bool:
         """Called when you the player is the target of stealing."""
-        counter_action, with_card = self.do_counter_action(Action.STEAL, source)
+        counter_action, with_card = self.do_counter_action(Action.STEAL, source, state)
         if counter_action is False:
             self.coins -= 2
 
         return counter_action, with_card
 
-    def target_coup(self, discard_pile: CardList):
-        return self.lose_influence(discard_pile)
+    def counter_coup(self, discard_pile: CardList):
+        self.lose_influence(discard_pile)
 
-    def lose_influence(self, discard_pile: CardList) -> int:
+    def lose_influence(self, discard_pile: CardList):
         # TODO: move appending to discard_pile into the Game controller
         card = self._lose_influence()
         self.logger.info(f"Lost a {card.name} influence")
         discard_pile.append(card)
-        return len(self._cards)
 
     def _lose_influence(self) -> Card:
         raise NotImplementedError
@@ -161,7 +160,7 @@ class Player:
     def _exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
-    def _do_counter_action(self, action: Action, source: Player) -> Tuple[bool, str]:
+    def _do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
         raise NotImplementedError
 
     def _do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, Player]:
