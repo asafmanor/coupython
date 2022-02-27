@@ -1,5 +1,5 @@
-import enum
 from deck import Deck
+from utils import FormattedEnum
 
 
 class _Player:
@@ -10,7 +10,7 @@ class IllegalActionError(Exception):
     pass
 
 
-class Action(enum.Enum):
+class Action(FormattedEnum):
     INCOME = 0
     FOREIGNAID = 1
     COUP = 2
@@ -26,10 +26,11 @@ class Action(enum.Enum):
         return self.name
 
 
-class CounterAction(enum.Enum):
+class CounterAction(FormattedEnum):
     BLOCK_FOREIGNAID = 7
     BLOCK_STEAL = 8
     BLOCK_ASSASSINATION = 9
+    CHALLANGE = 10
 
     def __repr__(self):
         return self.name
@@ -49,7 +50,9 @@ def requires_target(action: Action):
     return action in [Action.COUP, Action.ASSASSINATION, Action.STEAL]
 
 
-def check_legal_action(action: Action, player: _Player, target: _Player, deck: Deck = None):
+def check_legal_action(
+    action: Action, player: _Player, target: _Player, deck: Deck = None
+):
     """If action is illegal, IllegalActionError is raised."""
 
     if requires_target(action):

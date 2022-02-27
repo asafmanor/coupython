@@ -1,31 +1,26 @@
 from __future__ import annotations
 
-import enum
 import logging
 import random
 import sys
 from collections import defaultdict
-from typing import Dict, Sequence
+from typing import Sequence
 
 from action import Action, CounterAction, check_legal_action
 from cards import CardList
 from deck import Deck
 from player import Player
 from random_player import RandomPlayer
+from state import ChainOfEvents, ObservableState, ChallangeAftermath
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    stream=sys.stdout, level=logging.DEBUG, format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
+    stream=sys.stdout,
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)-12s %(message)s",
 )
 
 random.seed(0)
-
-
-class PlayerMode(enum.Enum):
-    ACTIVE = 0
-    TARGET = 1
-    COUNTER_TARGET = 2
-    CHALLENGER = 3
 
 
 class Game:
@@ -37,18 +32,8 @@ class Game:
         self.discard_pile = CardList()
         self.n = 0
 
-    @property
-    def state(self) -> Dict:
-        # TODO: need to be a state per player.
-        # + Add belief state
-        # + Add "mode" vector: enum of `active`, `challanger` (all players except active one), `target`, `counter-target`
-        return {
-            "player_stats": [
-                (player.num_cards, player.coins) for player in self.players
-            ],  # TODO: change to matrix (P * [N, C])
-            "discard_pile": self.discard_pile,  # TODO: change to mask (discarded / non-discarded)
-            "turn": self.n,
-        }
+    def state(self, chain_of_events: ChainOfEvents) -> ObservableState:
+        return ObservableState(self.players, self.discard_pile, self.n, chain_of_events)
 
     def __call__(self) -> Player:
         logger.info("Game starting.")
@@ -86,33 +71,203 @@ class Game:
 
     def turn(self):
         for active_player in self.players:
-            adversaries = [x for x in self.players if active_player != x]  # TODO: must be a better way to exclude
-            action, target = active_player.do_action(adversaries, self.state)
-            check_legal_action(
-                action, active_player, target, self.deck
-            )  # TODO: legality of action should be asserted by the player?
-            self._turn(active_player, action, target)
+            chain_of_events = ChainOfEvents()
 
-    def _get_single_random(self, challenges: Sequence[bool], challengers: Sequence[Player]) -> Player:
+            # Active player performing action
+            adversaries = [
+                x for x in self.players if active_player != x
+            ]  # TODO: must be a better way to exclude
+            action, target = active_player.do_action(
+                adversaries, self.state(chain_of_events)
+            )
+            # TODO: legality of action should be asserted by the player?
+            check_legal_action(action, active_player, target, self.deck)
+            chain_of_events.record(player=active_player, action=action, target=target)
+
+            challenges = [
+                adv.do_challenge(active_player, action, self.state(chain_of_events))
+                for adv in adversaries
+            ]
+            if any(challenges):
+                challenger = self._get_single_random(challenges, adversaries)
+
+                aftermath = self.solve_challenge(
+                    challenger=challenger, challenged=active_player, action=action
+                )
+                chain_of_events.record(
+                    player=challenger,
+                    action=CounterAction.CHALLANGE,
+                    target=active_player,
+                    info=aftermath,
+                )
+
+            else:
+                if action == Action.INCOME:
+                    active_player.income()  # TODO: return reward
+
+                elif action == Action.FOREIGNAID:
+                    counter_actions = [
+                        adv.counter_foreign_aid(
+                            active_player, self.state(chain_of_events)
+                        )[0]
+                        for adv in adversaries
+                    ]
+                    if any(counter_actions):
+                        player_claiming_to_have_duke = self._get_single_random(
+                            counter_actions, adversaries
+                        )
+                        chain_of_events.record(
+                            player=player_claiming_to_have_duke,
+                            action=CounterAction.BLOCK_FOREIGNAID,
+                            target=active_player,
+                        )
+
+                        counter_challenge = active_player.do_challenge(
+                            player_claiming_to_have_duke,
+                            CounterAction.BLOCK_FOREIGNAID,
+                            self.state(chain_of_events),
+                        )
+                        if counter_challenge:
+                            aftermath = self.solve_challenge(
+                                challenger=active_player,
+                                challenged=player_claiming_to_have_duke,
+                                action=CounterAction.BLOCK_FOREIGNAID,
+                            )
+                            chain_of_events.record(
+                                player=active_player,
+                                action=CounterAction.CHALLANGE,
+                                target=player_claiming_to_have_duke,
+                                info=aftermath,
+                            )
+
+                    else:
+                        active_player.foreign_aid()
+
+                elif action == Action.COUP:
+                    active_player.coup()
+                    target.lose_influence(self.discard_pile)
+
+                    if target.num_cards == 0:
+                        self.remove_player(target)
+
+                elif action == Action.TAX:
+                    active_player.tax()
+
+                elif action == Action.ASSASSINATION:
+                    ca, _ = target.counter_assassinate(
+                        active_player, self.discard_pile, self.state(chain_of_events)
+                    )
+                    if ca:
+                        player_claiming_to_have_contessa = target
+                        chain_of_events.record(
+                            player=player_claiming_to_have_contessa,
+                            action=CounterAction.BLOCK_ASSASSINATION,
+                            target=active_player,
+                        )
+
+                        counter_challenge = active_player.do_challenge(
+                            player_claiming_to_have_contessa,
+                            CounterAction.BLOCK_ASSASSINATION,
+                            self.state(chain_of_events),
+                        )
+                        if counter_challenge:
+                            aftermath = self.solve_challenge(
+                                challenger=active_player,
+                                challenged=player_claiming_to_have_contessa,
+                                action=CounterAction.BLOCK_ASSASSINATION,
+                            )
+                            chain_of_events.record(
+                                player=active_player,
+                                action=CounterAction.CHALLANGE,
+                                target=player_claiming_to_have_contessa,
+                                info=aftermath,
+                            )
+
+                    else:
+                        active_player.assassinate()
+                        if target.num_cards == 0:
+                            self.remove_player(target)
+
+                elif action == Action.EXCHANGE:
+                    active_player.exchange(self.deck)
+
+                elif action == Action.STEAL:
+                    ca, with_card = target.counter_steal(
+                        active_player, self.state(chain_of_events)
+                    )
+                    if ca:
+                        player_claiming_to_have_captain_or_ambassador = target
+                        chain_of_events.record(
+                            player=player_claiming_to_have_captain_or_ambassador,
+                            action=CounterAction.BLOCK_STEAL,
+                            target=active_player,
+                            info=with_card,
+                        )
+
+                        counter_challenge = active_player.do_challenge(
+                            player_claiming_to_have_captain_or_ambassador,
+                            CounterAction.BLOCK_STEAL,
+                            self.state(chain_of_events),
+                        )
+                        if counter_challenge:
+                            aftermath = self.solve_challenge(
+                                challenger=active_player,
+                                challenged=player_claiming_to_have_captain_or_ambassador,
+                                action=CounterAction.BLOCK_STEAL,
+                                with_card=with_card,
+                            )
+                            chain_of_events.record(
+                                player=active_player,
+                                action=CounterAction.CHALLANGE,
+                                target=player_claiming_to_have_captain_or_ambassador,
+                                info=aftermath,
+                            )
+
+                    else:
+                        active_player.steal()
+
+            chain_of_events()
+
+    def _get_single_random(
+        self, challenges: Sequence[bool], challengers: Sequence[Player]
+    ) -> Player:
         ch_pl_tuples = [x for x in zip(challenges, challengers)]
         random.shuffle(ch_pl_tuples)
         for ch, pl in ch_pl_tuples:
             if ch:
                 return pl
 
-    def solve_challenge(self, challenger: Player, challenged: Player, action: Action, with_card: str = None):
+    def solve_challenge(
+        self,
+        challenger: Player,
+        challenged: Player,
+        action: Action,
+        with_card: str = None,
+    ) -> ChallangeAftermath:
         def solve(card_name: str):
+            """Solve the challange by checking the challenged / challenger cards.
+
+            Args:
+                card_name (str): The card name to check.
+
+            Returns:
+                ChallangeAftermath: If the challanger won, i.e. the challenged does not have the card.
+            """
+
             if challenged.has(card_name):
                 logger.info(f"{challenged} has the card {card_name}!")
                 challenged.replace(card_name, self.deck)
                 challenger.lose_influence(self.discard_pile)
                 if challenger.num_cards == 0:
                     self.remove_player(challenger)
+                return ChallangeAftermath.LOST
+
             else:
                 logger.info(f"{challenged} does not have the card {card_name}!")
                 challenged.lose_influence(self.discard_pile)
                 if challenged.num_cards == 0:
                     self.remove_player(challenged)
+                return ChallangeAftermath.WON
 
         if action == Action.INCOME:
             raise RuntimeError("INCOME Action was challenged.")
@@ -121,21 +276,23 @@ class Game:
         elif action == Action.COUP:
             raise RuntimeError("COUP Action was challenged.")
         elif action == Action.TAX:
-            solve("Duke")
+            return solve("Duke")
         elif action == Action.ASSASSINATION:
-            solve("Assassin")
+            return solve("Assassin")
         elif action == Action.EXCHANGE:
-            solve("Ambassador")
+            return solve("Ambassador")
         elif action == Action.STEAL:
-            solve("Captain")
+            return solve("Captain")
         elif action == CounterAction.BLOCK_STEAL:
             if with_card not in ("Captain", "Ambassador"):
-                raise RuntimeError(f"{challenged} tried to block stealing with {with_card}")
-            solve(with_card)
+                raise RuntimeError(
+                    f"{challenged} tried to block stealing with {with_card}"
+                )
+            return solve(with_card)
         elif action == CounterAction.BLOCK_FOREIGNAID:
-            solve("Duke")
+            return solve("Duke")
         elif action == CounterAction.BLOCK_ASSASSINATION:
-            solve("Contessa")
+            return solve("Contessa")
         else:
             raise RuntimeError(f"How do we solve a challange to {action}??")
 
@@ -145,80 +302,6 @@ class Game:
                 self.players.pop(idx)
                 logger.info(f"Player {player} was removed from the game.")
                 logger.debug(f"List of players: {self.players}")
-
-    def _turn(self, active_player: Player, action: Action, target: Player):
-        adversaries = [x for x in self.players if active_player != x]  # TODO: must be a better way to exclude
-        challenges = [adv.do_challenge(active_player, action, self.state) for adv in adversaries]
-        if any(challenges):
-            challenger = self._get_single_random(challenges, adversaries)
-            self.solve_challenge(challenger=challenger, challenged=active_player, action=action)
-
-        else:
-            if action == Action.INCOME:
-                active_player.income()  # TODO: return reward
-
-            elif action == Action.FOREIGNAID:
-                counter_actions = [adv.counter_foreign_aid(active_player, self.state)[0] for adv in adversaries]
-                if any(counter_actions):
-                    player_claiming_to_have_duke = self._get_single_random(counter_actions, adversaries)
-                    counter_challenge = active_player.do_challenge(
-                        player_claiming_to_have_duke,
-                        CounterAction.BLOCK_FOREIGNAID,
-                        self.state,
-                    )
-                    if counter_challenge:
-                        self.solve_challenge(
-                            challenger=active_player,
-                            challenged=player_claiming_to_have_duke,
-                            action=CounterAction.BLOCK_FOREIGNAID,
-                        )
-
-                else:
-                    active_player.foreign_aid()
-
-            elif action == Action.COUP:
-                active_player.coup()
-                target.counter_coup(self.discard_pile)
-
-                if target.num_cards == 0:
-                    self.remove_player(target)
-
-            elif action == Action.TAX:
-                active_player.tax()
-
-            elif action == Action.ASSASSINATION:
-                ca, _ = target.counter_assassinate(active_player, self.discard_pile, self.state)
-                if ca:
-                    counter_challenge = active_player.do_challenge(
-                        target, CounterAction.BLOCK_ASSASSINATION, self.state
-                    )
-                    if counter_challenge:
-                        self.solve_challenge(
-                            challenger=active_player, challenged=target, action=CounterAction.BLOCK_ASSASSINATION,
-                        )
-
-                else:
-                    active_player.assassinate()
-                    if target.num_cards == 0:
-                        self.remove_player(target)
-
-            elif action == Action.EXCHANGE:
-                active_player.exchange(self.deck)
-
-            elif action == Action.STEAL:
-                ca, with_card = target.counter_steal(active_player, self.state)
-                if ca:
-                    counter_challenge = active_player.do_challenge(target, CounterAction.BLOCK_STEAL, self.state)
-                    if counter_challenge:
-                        self.solve_challenge(
-                            challenger=active_player,
-                            challenged=target,
-                            action=CounterAction.BLOCK_STEAL,
-                            with_card=with_card,
-                        )
-
-                else:
-                    active_player.steal()
 
 
 if __name__ == "__main__":

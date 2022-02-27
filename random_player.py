@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import random
-from typing import Dict, Sequence, Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 
 from action import Action, requires_target
 from cards import Card, CardList
 from player import Player
+from state import ObservableState
 
 
 class InsufficientFundsError(Exception):
@@ -21,16 +22,22 @@ class RandomPlayer(Player):
         return self._cards.pop()
 
     def _exchange(self, extra_cards: CardList) -> CardList:
-        self.logger.debug(f"Has {self._cards} and got {extra_cards} from the deck.")
+        self.logger.debug(
+            f"EXCHANGE: Has {self._cards} and got {extra_cards} from the deck."
+        )
         all_cards = self._cards + extra_cards
         random.shuffle(all_cards)
         card0, card1 = all_cards.pop(), all_cards.pop()
-        self.logger.debug(f"Player {self} returns {card0} and {card1} to the pile.")
+        self.logger.debug(
+            f"EXCHANGE: Player {self} returns {card0} and {card1} to the pile."
+        )
         self._cards = CardList(all_cards)
-        self.logger.debug(f"Has {self._cards} now.")
+        self.logger.debug(f"EXCHANGE: Has {self._cards} now.")
         return CardList([card0, card1])
 
-    def _do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
+    def _do_counter_action(
+        self, action: Action, source: Player, state: ObservableState
+    ) -> Tuple[bool, str]:
         if action == Action.FOREIGNAID:
             with_card = "Duke"
         elif action == Action.ASSASSINATION:
@@ -40,7 +47,9 @@ class RandomPlayer(Player):
 
         return np.random.choice([True, False], 1, p=[0.5, 0.5]).item(), with_card
 
-    def _do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, Player]:
+    def _do_action(
+        self, players: Sequence[Player], state: ObservableState
+    ) -> Tuple[Action, Player]:
         all_actions = [x for x in Action]
 
         if self.coins > 10:
@@ -62,5 +71,7 @@ class RandomPlayer(Player):
 
         return action, target
 
-    def _do_challenge(self, source: Player, action: Action, state: Dict) -> bool:
+    def _do_challenge(
+        self, source: Player, action: Action, state: ObservableState
+    ) -> bool:
         return np.random.choice([True, False], 1, p=[0.1, 0.9]).item()

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Sequence, Tuple
+from typing import Sequence, Tuple
 
-from action import Action, ACTION_TO_COUNTER_ACTION
+from action import ACTION_TO_COUNTER_ACTION, Action
 from cards import Card, CardList
 from deck import CheatingError, Deck
+from state import ObservableState
 
 
 class InsufficientFundsError(Exception):
@@ -87,11 +88,14 @@ class Player:
         deck._shuffle()
 
         if current_num_cards != len(self._cards):
-            raise RuntimeError("Number of cards returned from _exchange " + f"is inequivalent to {current_num_cards}")
+            raise RuntimeError(
+                "Number of cards returned from _exchange "
+                + f"is inequivalent to {current_num_cards}"
+            )
 
         # TODO add assertion that no card is both in the deck and in a player's hand!
 
-    def do_challenge(self, source, action: Action, state: Dict) -> bool:
+    def do_challenge(self, source, action: Action, state: ObservableState) -> bool:
         if action in [Action.INCOME, Action.FOREIGNAID, Action.COUP]:
             return False
 
@@ -101,7 +105,9 @@ class Player:
             self.logger.info(f"Challanged action {action} of player {source}")
         return challange
 
-    def do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, None]:  # TODO change to state. this is PI.
+    def do_action(
+        self, players: Sequence[Player], state: ObservableState
+    ) -> Tuple[Action, None]:
         action, target = self._do_action(players, state)
         assert isinstance(action, Action)
         if target:
@@ -113,7 +119,9 @@ class Player:
 
         return action, target
 
-    def do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
+    def do_counter_action(
+        self, action: Action, source: Player, state: ObservableState
+    ) -> Tuple[bool, str]:
         counter_action, with_card = self._do_counter_action(action, source, state)
         assert isinstance(counter_action, bool)
         if with_card:
@@ -121,32 +129,40 @@ class Player:
 
         if counter_action:
             counter_action_type = ACTION_TO_COUNTER_ACTION[action]
-            self.logger.info(f"Performs counter-action {counter_action_type} with {with_card} on {source}")
+            self.logger.info(
+                f"Performs counter-action {counter_action_type} with {with_card} on {source}"
+            )
         else:
             self.logger.info(f"Does not counter {action} by {source}")
         return counter_action, with_card
 
-    def counter_foreign_aid(self, source: Player, state: Dict) -> Tuple[bool, str]:
-        return self.do_counter_action(Action.FOREIGNAID, source, state)
+    def counter_foreign_aid(
+        self, source: Player, state: ObservableState
+    ) -> Tuple[bool, str]:
+        ca, with_card = self.do_counter_action(Action.FOREIGNAID, source, state)
+        if ca:
+            assert with_card == "Duke"
+        return ca, with_card
 
-    def counter_assassinate(self, source: Player, discard_pile: CardList, state: Dict) -> Tuple[bool, str]:
+    def counter_assassinate(
+        self, source: Player, discard_pile: CardList, state: ObservableState
+    ) -> Tuple[bool, str]:
         """Called when you the player is the target of an assassination."""
-        counter_action, with_card = self.do_counter_action(Action.ASSASSINATION, source, state)
-        if not counter_action:
+        ca, with_card = self.do_counter_action(Action.ASSASSINATION, source, state)
+        if ca:
+            assert with_card == "Contessa"
+        else:
             self.lose_influence(discard_pile)
+        return ca, with_card
 
-        return counter_action, with_card
-
-    def counter_steal(self, source: Player, state: Dict) -> bool:
+    def counter_steal(self, source: Player, state: ObservableState) -> bool:
         """Called when you the player is the target of stealing."""
-        counter_action, with_card = self.do_counter_action(Action.STEAL, source, state)
-        if counter_action is False:
+        ca, with_card = self.do_counter_action(Action.STEAL, source, state)
+        if ca:
+            assert with_card in ["Captain", "Ambassador"]
+        else:
             self.coins -= 2
-
-        return counter_action, with_card
-
-    def counter_coup(self, discard_pile: CardList):
-        self.lose_influence(discard_pile)
+        return ca, with_card
 
     def lose_influence(self, discard_pile: CardList):
         # TODO: move appending to discard_pile into the Game controller
@@ -160,11 +176,17 @@ class Player:
     def _exchange(self, extra_cards: CardList) -> CardList:
         raise NotImplementedError
 
-    def _do_counter_action(self, action: Action, source: Player, state: Dict) -> Tuple[bool, str]:
+    def _do_counter_action(
+        self, action: Action, source: Player, state: ObservableState
+    ) -> Tuple[bool, str]:
         raise NotImplementedError
 
-    def _do_action(self, players: Sequence[Player], state: Dict) -> Tuple[Action, Player]:
+    def _do_action(
+        self, players: Sequence[Player], state: ObservableState
+    ) -> Tuple[Action, Player]:
         raise NotImplementedError
 
-    def _do_challenge(self, source: Player, action: Action, state: Dict) -> bool:
+    def _do_challenge(
+        self, source: Player, action: Action, state: ObservableState
+    ) -> bool:
         raise NotImplementedError
