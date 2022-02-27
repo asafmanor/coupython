@@ -119,7 +119,7 @@ class Player:
 
         return action, target
 
-    def do_counter_action(
+    def __do_counter_action__(
         self, action: Action, source: Player, state: ObservableState
     ) -> Tuple[bool, str]:
         counter_action, with_card = self._do_counter_action(action, source, state)
@@ -139,7 +139,7 @@ class Player:
     def counter_foreign_aid(
         self, source: Player, state: ObservableState
     ) -> Tuple[bool, str]:
-        ca, with_card = self.do_counter_action(Action.FOREIGNAID, source, state)
+        ca, with_card = self.__do_counter_action__(Action.FOREIGNAID, source, state)
         if ca:
             assert with_card == "Duke"
         return ca, with_card
@@ -148,7 +148,7 @@ class Player:
         self, source: Player, discard_pile: CardList, state: ObservableState
     ) -> Tuple[bool, str]:
         """Called when you the player is the target of an assassination."""
-        ca, with_card = self.do_counter_action(Action.ASSASSINATION, source, state)
+        ca, with_card = self.__do_counter_action__(Action.ASSASSINATION, source, state)
         if ca:
             assert with_card == "Contessa"
         else:
@@ -157,7 +157,7 @@ class Player:
 
     def counter_steal(self, source: Player, state: ObservableState) -> bool:
         """Called when you the player is the target of stealing."""
-        ca, with_card = self.do_counter_action(Action.STEAL, source, state)
+        ca, with_card = self.__do_counter_action__(Action.STEAL, source, state)
         if ca:
             assert with_card in ["Captain", "Ambassador"]
         else:

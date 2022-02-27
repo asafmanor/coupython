@@ -25,7 +25,7 @@ class ChainOfEvents:
         raise NotImplementedError
 
     def __call__(self):
-        self.logger.info(str(self._events))
+        self.logger.debug(str(self._events))
         return self._events
 
 
