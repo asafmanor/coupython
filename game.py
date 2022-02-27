@@ -6,12 +6,14 @@ import sys
 from collections import defaultdict
 from typing import Sequence
 
+import numpy as np
+
 from action import Action, CounterAction, check_legal_action
 from cards import CardList
 from deck import Deck
 from player import Player
 from random_player import RandomPlayer
-from state import ChainOfEvents, ObservableState, ChallangeAftermath
+from state import ChainOfEvents, ChallangeAftermath, ObservableState
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -19,8 +21,6 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)-8s %(name)-12s %(message)s",
 )
-
-random.seed(0)
 
 
 class Game:
@@ -305,8 +305,10 @@ class Game:
 
 
 if __name__ == "__main__":
-    winners = defaultdict(int)
-    for _ in range(50):
+    random.seed(0)
+    np.random.seed(0)
+
+    for _ in range(10):
         all_players = [
             RandomPlayer("Asaf"),
             RandomPlayer("Nitai"),
@@ -318,12 +320,9 @@ if __name__ == "__main__":
         players = all_players
         game = Game(players)
         winner = game()
-        winners[winner.name] += 1
-
-    print(winners)
 
 """
-- Counter actions - everybody can challange!
+- Counter actions - everybody can challange?
 - Unit tests after each turn:
     - Total number of cards in the game.
     - Total number of coins in the game.
