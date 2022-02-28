@@ -34,10 +34,13 @@ class ObservableState:
         self,
         players: List[_Player],
         discard_pile: CardList,
-        turn: int,
+        _round: int,
         chain_of_events: ChainOfEvents,
     ):
         self._player_stats = [(x.name, x.num_cards, x.coins) for x in players]
         self._discard_pile = discard_pile
-        self._turn = turn
+        self._round = _round
         self._chain_of_events = chain_of_events
+
+    def embed(self):
+        raise NotImplementedError

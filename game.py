@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import random
 import sys
-from collections import defaultdict
 from typing import Sequence
 
 import numpy as np
@@ -33,7 +32,12 @@ class Game:
         self.n = 0
 
     def state(self, chain_of_events: ChainOfEvents) -> ObservableState:
-        return ObservableState(self.players, self.discard_pile, self.n, chain_of_events)
+        return ObservableState(
+            players=self.players,
+            discard_pile=self.discard_pile,
+            _round=self.n,
+            chain_of_events=chain_of_events,
+        )
 
     def __call__(self) -> Player:
         logger.info("Game starting.")
@@ -45,7 +49,7 @@ class Game:
 
         while True:
             self.n += 1
-            self.turn()
+            self._round()
             print(str(game))
 
             # Finalize game
@@ -57,7 +61,7 @@ class Game:
 
     def __str__(self):
         out = "\n" + "=" * 70 + "\n"
-        out += "=" * 25 + f"   Turn number {self.n:2d}   " + "=" * 25 + "\n"
+        out += "=" * 25 + f"   round number {self.n:2d}   " + "=" * 25 + "\n"
         out += "=" * 70 + "\n"
         for player in self.players:
             out += f"{str(player):10} | {player.coins:02d} coins | {player._cards}\n"
@@ -69,7 +73,7 @@ class Game:
     def __repr__(self):
         return str(self)
 
-    def turn(self):
+    def _round(self):
         for active_player in self.players:
             chain_of_events = ChainOfEvents()
 
@@ -323,7 +327,7 @@ if __name__ == "__main__":
 
 """
 - Counter actions - everybody can challange?
-- Unit tests after each turn:
+- Unit tests after each round:
     - Total number of cards in the game.
     - Total number of coins in the game.
 """
