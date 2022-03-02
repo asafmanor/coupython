@@ -13,6 +13,7 @@ class ChallangeAftermath(FormattedEnum):
     LOST = False
 
 
+# TODO: rethink if we want the chain_of_events to contain > 1 turn, maybe entire history?
 class ChainOfEvents:
     def __init__(self):
         self._events = []
